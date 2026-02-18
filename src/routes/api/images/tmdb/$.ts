@@ -1,26 +1,30 @@
-import { createAPIFileRoute } from "@tanstack/react-start/api";
+import { createFileRoute } from "@tanstack/react-router";
 
-export const APIRoute = createAPIFileRoute("/api/images/tmdb/$")({
-  GET: async ({ params }) => {
-    const imagePath = "/" + (params as any)["*"];
-    const tmdbImageBase = "https://image.tmdb.org/t/p/w400";
+export const Route = createFileRoute("/api/images/tmdb/$")({
+  server: {
+    handlers: {
+      GET: async ({ params }) => {
+        const imagePath = "/" + (params as any)["*"];
+        const tmdbImageBase = "https://image.tmdb.org/t/p/w400";
 
-    try {
-      const url = `${tmdbImageBase}${imagePath}`;
-      const response = await fetch(url);
+        try {
+          const url = `${tmdbImageBase}${imagePath}`;
+          const response = await fetch(url);
 
-      if (!response.ok) {
-        return new Response("Image not found", { status: response.status });
-      }
+          if (!response.ok) {
+            return new Response("Image not found", { status: response.status });
+          }
 
-      return new Response(response.body, {
-        headers: {
-          "Content-Type": response.headers.get("content-type") ?? "image/jpeg",
-          "Cache-Control": "public, max-age=86400",
-        },
-      });
-    } catch {
-      return new Response("Failed to fetch image", { status: 502 });
-    }
+          return new Response(response.body, {
+            headers: {
+              "Content-Type": response.headers.get("content-type") ?? "image/jpeg",
+              "Cache-Control": "public, max-age=86400",
+            },
+          });
+        } catch {
+          return new Response("Failed to fetch image", { status: 502 });
+        }
+      },
+    },
   },
 });
