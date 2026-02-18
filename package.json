@@ -1,0 +1,33 @@
+{
+  "name": "movie-vote",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "@tanstack/react-router": "^1.120.0",
+    "@tanstack/react-start": "^1.120.0",
+    "dotenv": "^16.4.7",
+    "drizzle-kit": "^0.31.0",
+    "drizzle-orm": "^0.43.0",
+    "framer-motion": "^11.18.0",
+    "nitro": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vite-tsconfig-paths": "^5.1.0"
+  }
+}

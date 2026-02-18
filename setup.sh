@@ -163,10 +163,9 @@ else
   if [[ ! -f "${APPDATA_DIR}/docker-compose.yml" ]]; then
     info "Cloning repository..."
     ask REPO_URL "GitHub repo URL" "$REPO_URL"
-    # Clone into a temp dir then move, so we can clone even if APPDATA_DIR exists
+    # Clone into a temp dir then copy, so we can clone even if APPDATA_DIR already exists
     TEMP_DIR="$(mktemp -d)"
     git clone "$REPO_URL" "$TEMP_DIR"
-    # Move contents into appdata dir (preserving any existing .env or db/)
     mkdir -p "$APPDATA_DIR"
     cp -r "$TEMP_DIR"/. "$APPDATA_DIR/"
     rm -rf "$TEMP_DIR"
@@ -214,26 +213,25 @@ else
   fi
 
   echo
-  # Secrets
-  echo -e "  ${DIM}Generating secure random secrets for ADMIN_SECRET and COOKIE_SECRET...${RESET}"
+  # Admin secret
+  echo -e "  ${DIM}Generating a secure random admin secret...${RESET}"
   DEFAULT_ADMIN_SECRET="$(gen_secret)"
-  DEFAULT_COOKIE_SECRET="$(gen_secret)"
 
-  if ask_yn "Use auto-generated secrets? (recommended)"; then
+  if ask_yn "Use auto-generated admin secret? (recommended)"; then
     ADMIN_SECRET="$DEFAULT_ADMIN_SECRET"
-    COOKIE_SECRET="$DEFAULT_COOKIE_SECRET"
   else
-    ask_secret ADMIN_SECRET  "Admin secret (you'll use this to log into /admin)"
-    ask_secret COOKIE_SECRET "Cookie signing secret"
-    while [[ -z "$ADMIN_SECRET" || -z "$COOKIE_SECRET" ]]; do
-      error "Both secrets are required."
-      ask_secret ADMIN_SECRET  "Admin secret"
-      ask_secret COOKIE_SECRET "Cookie signing secret"
+    ask_secret ADMIN_SECRET "Admin secret (you'll use this to log into /admin)"
+    while [[ -z "$ADMIN_SECRET" ]]; do
+      error "Admin secret cannot be empty."
+      ask_secret ADMIN_SECRET "Admin secret"
     done
   fi
 
   # Write .env
   cat > "$ENV_FILE" <<EOF
+# Database
+DATABASE_URL=file:/app/db-data/movienightapp.db
+
 # Jellyfin
 JELLYFIN_URL=${JELLYFIN_URL}
 JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
@@ -242,9 +240,8 @@ JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
 JELLYSEERR_URL=${JELLYSEERR_URL}
 JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY}
 
-# App secrets — keep these private
+# App secret — keep this private
 ADMIN_SECRET=${ADMIN_SECRET}
-COOKIE_SECRET=${COOKIE_SECRET}
 EOF
 
   chmod 600 "$ENV_FILE"
@@ -277,15 +274,15 @@ else
   echo -e "  ${CYAN}docker network connect ${NETWORK_NAME} jellyseerr${RESET}"
   echo
   if ! ask_yn "Have you connected them (or will do so now)?"; then
-    warn "Continuing anyway — the app will start but backend won't reach Jellyfin until you connect it."
+    warn "Continuing anyway — the app will start but won't reach Jellyfin until you connect it."
   fi
 fi
 
 # ─────────────────────────────────────────────────────────────
 #  Build and start
 # ─────────────────────────────────────────────────────────────
-header "Building and starting containers"
-echo -e "  ${DIM}First build takes 3-5 minutes (compiling SQLite, bundling React).${RESET}"
+header "Building and starting container"
+echo -e "  ${DIM}First build takes 3-5 minutes (installing dependencies, bundling app).${RESET}"
 echo
 
 cd "$APPDATA_DIR"
@@ -294,24 +291,24 @@ cd "$APPDATA_DIR"
 info "Pulling base images..."
 docker_compose pull --ignore-pull-failures 2>/dev/null || true
 
-info "Building images..."
+info "Building image..."
 docker_compose build
 
-info "Starting containers..."
+info "Starting container..."
 docker_compose up -d
 
 # ─────────────────────────────────────────────────────────────
 #  Health check
 # ─────────────────────────────────────────────────────────────
-header "Waiting for backend to be ready"
+header "Waiting for app to be ready"
 
-MAX_WAIT=60
+MAX_WAIT=90
 WAITED=0
 printf "  "
 while [[ $WAITED -lt $MAX_WAIT ]]; do
-  if curl -sf http://localhost:3001/api/health &>/dev/null; then
+  if curl -sf http://localhost:8090/api/health &>/dev/null; then
     echo
-    success "Backend is up"
+    success "App is up"
     break
   fi
   printf "."
@@ -321,8 +318,8 @@ done
 
 if [[ $WAITED -ge $MAX_WAIT ]]; then
   echo
-  warn "Backend didn't respond in ${MAX_WAIT}s — it may still be starting."
-  warn "Check logs with: docker-compose -f ${APPDATA_DIR}/docker-compose.yml logs backend"
+  warn "App didn't respond in ${MAX_WAIT}s — it may still be starting."
+  warn "Check logs with: docker-compose -f ${APPDATA_DIR}/docker-compose.yml logs app"
 fi
 
 # ─────────────────────────────────────────────────────────────

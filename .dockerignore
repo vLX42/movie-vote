@@ -1,0 +1,13 @@
+node_modules
+.git
+.gitignore
+*.md
+.DS_Store
+*.db
+db/
+.env
+.env.*
+!.env.example
+dist
+.output
+drizzle/meta
