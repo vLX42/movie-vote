@@ -10,4 +10,3 @@ db/
 !.env.example
 dist
 .output
-drizzle/meta
