@@ -152,7 +152,7 @@ success "Directory ready: ${APPDATA_DIR}"
 # ─────────────────────────────────────────────────────────────
 header "Fetching application code"
 
-REPO_URL="https://github.com/YOUR_USERNAME/movie-vote.git"
+REPO_URL="https://github.com/vlx42/movie-vote.git"
 
 if [[ "$IS_UPDATE" == true ]]; then
   info "Pulling latest code..."
