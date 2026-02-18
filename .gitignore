@@ -1,0 +1,23 @@
+# Environment
+.env
+.env.local
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build output
+frontend/dist/
+
+# Database
+db/*.sqlite
+db/*.sqlite-wal
+db/*.sqlite-shm
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

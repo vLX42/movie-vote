@@ -1,0 +1,21 @@
+.notfound-page {
+  text-align: center;
+}
+
+.notfound-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.notfound-tape {
+  font-size: 2rem;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+}
+
+.notfound-sub {
+  color: var(--text-muted);
+}

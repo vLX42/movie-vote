@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "8090:80"
+    depends_on:
+      - backend
+    networks:
+      - movienightnet
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/data/movienightapp.sqlite
+      - JELLYFIN_URL=${JELLYFIN_URL:-http://jellyfin:8096}
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
+      - JELLYSEERR_URL=${JELLYSEERR_URL:-http://jellyseerr:5055}
+      - JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY}
+      - ADMIN_SECRET=${ADMIN_SECRET}
+      - COOKIE_SECRET=${COOKIE_SECRET}
+      - PORT=3001
+    volumes:
+      - ./db:/data
+    networks:
+      - movienightnet
+    restart: unless-stopped
+
+networks:
+  movienightnet:
+    external: true
