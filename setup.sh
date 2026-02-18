@@ -144,15 +144,16 @@ if [[ "$IS_UPDATE" == false ]]; then
   fi
 fi
 
-mkdir -p "${APPDATA_DIR}/db"
-success "Directory ready: ${APPDATA_DIR}"
+# Parent dir must exist before clone; db/ is created after
+mkdir -p "$(dirname "$APPDATA_DIR")"
+success "Directory ready: $(dirname "$APPDATA_DIR")"
 
 # ─────────────────────────────────────────────────────────────
 #  Clone or update code
 # ─────────────────────────────────────────────────────────────
 header "Fetching application code"
 
-REPO_URL="https://github.com/vlx42/movie-vote.git"
+REPO_URL="https://github.com/vLX42/movie-vote.git"
 
 if [[ "$IS_UPDATE" == true ]]; then
   info "Pulling latest code..."
@@ -160,22 +161,23 @@ if [[ "$IS_UPDATE" == true ]]; then
   success "Code updated"
 else
   if [[ ! -f "${APPDATA_DIR}/docker-compose.yml" ]]; then
-    # Try to copy from current script location first
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [[ -f "${SCRIPT_DIR}/docker-compose.yml" ]]; then
-      info "Copying from local source: ${SCRIPT_DIR}"
-      cp -r "${SCRIPT_DIR}/." "${APPDATA_DIR}/"
-      success "Files copied"
-    else
-      info "Cloning repository..."
-      ask REPO_URL "GitHub repo URL" "$REPO_URL"
-      git clone "$REPO_URL" "$APPDATA_DIR"
-      success "Repository cloned"
-    fi
+    info "Cloning repository..."
+    ask REPO_URL "GitHub repo URL" "$REPO_URL"
+    # Clone into a temp dir then move, so we can clone even if APPDATA_DIR exists
+    TEMP_DIR="$(mktemp -d)"
+    git clone "$REPO_URL" "$TEMP_DIR"
+    # Move contents into appdata dir (preserving any existing .env or db/)
+    mkdir -p "$APPDATA_DIR"
+    cp -r "$TEMP_DIR"/. "$APPDATA_DIR/"
+    rm -rf "$TEMP_DIR"
+    success "Repository cloned"
   else
     success "Source files already present"
   fi
 fi
+
+# Ensure db directory exists for SQLite persistence
+mkdir -p "${APPDATA_DIR}/db"
 
 # ─────────────────────────────────────────────────────────────
 #  Environment configuration
