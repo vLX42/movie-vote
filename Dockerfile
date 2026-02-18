@@ -15,6 +15,5 @@ RUN pnpm run build
 FROM base
 COPY --from=prod-deps /app/node_modules /app/node_modules
 COPY --from=build /app/.output /app/.output
-COPY --from=build /app/drizzle /app/drizzle
 EXPOSE 3000
 CMD ["sh", "-c", "pnpm db:migrate && pnpm start"]

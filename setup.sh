@@ -119,10 +119,10 @@ success "git found"
 #  Detect existing installation
 # ─────────────────────────────────────────────────────────────
 IS_UPDATE=false
-if [[ -d "$APPDATA_DIR/.git" ]]; then
+if [[ -d "$APPDATA_DIR" ]]; then
   echo
   warn "Existing installation detected at ${APPDATA_DIR}"
-  if ask_yn "Pull latest code and redeploy? (existing .env will be kept)"; then
+  if ask_yn "Update code and redeploy? (existing .env and database will be kept)"; then
     IS_UPDATE=true
   else
     echo "Aborting."
@@ -134,15 +134,6 @@ fi
 #  Directory setup
 # ─────────────────────────────────────────────────────────────
 header "Setting up directories"
-
-if [[ "$IS_UPDATE" == false ]]; then
-  if [[ -d "$APPDATA_DIR" && "$(ls -A "$APPDATA_DIR" 2>/dev/null)" ]]; then
-    warn "${APPDATA_DIR} already exists and is not empty."
-    if ! ask_yn "Continue and write into it?"; then
-      exit 0
-    fi
-  fi
-fi
 
 # Parent dir must exist before clone; db/ is created after
 mkdir -p "$(dirname "$APPDATA_DIR")"
@@ -156,23 +147,30 @@ header "Fetching application code"
 REPO_URL="https://github.com/vLX42/movie-vote.git"
 
 if [[ "$IS_UPDATE" == true ]]; then
-  info "Pulling latest code..."
-  git -C "$APPDATA_DIR" pull
-  success "Code updated"
-else
-  if [[ ! -f "${APPDATA_DIR}/docker-compose.yml" ]]; then
-    info "Cloning repository..."
-    ask REPO_URL "GitHub repo URL" "$REPO_URL"
-    # Clone into a temp dir then copy, so we can clone even if APPDATA_DIR already exists
+  info "Fetching latest code..."
+  if [[ -d "$APPDATA_DIR/.git" ]]; then
+    # Fetch and hard-reset to avoid merge conflicts
+    git -C "$APPDATA_DIR" fetch origin
+    git -C "$APPDATA_DIR" reset --hard origin/HEAD
+  else
+    # No git repo — re-clone into temp and overlay source files
     TEMP_DIR="$(mktemp -d)"
     git clone "$REPO_URL" "$TEMP_DIR"
-    mkdir -p "$APPDATA_DIR"
+    # Sync source files; preserve .env and db/
     cp -r "$TEMP_DIR"/. "$APPDATA_DIR/"
     rm -rf "$TEMP_DIR"
-    success "Repository cloned"
-  else
-    success "Source files already present"
   fi
+  success "Code updated"
+else
+  info "Cloning repository..."
+  ask REPO_URL "GitHub repo URL" "$REPO_URL"
+  # Clone into a temp dir then copy, so we can clone even if APPDATA_DIR already exists
+  TEMP_DIR="$(mktemp -d)"
+  git clone "$REPO_URL" "$TEMP_DIR"
+  mkdir -p "$APPDATA_DIR"
+  cp -r "$TEMP_DIR"/. "$APPDATA_DIR/"
+  rm -rf "$TEMP_DIR"
+  success "Repository cloned"
 fi
 
 # Ensure db directory exists for SQLite persistence
@@ -295,7 +293,7 @@ info "Building image..."
 docker_compose build
 
 info "Starting container..."
-docker_compose up -d
+docker_compose up -d --force-recreate
 
 # ─────────────────────────────────────────────────────────────
 #  Health check
