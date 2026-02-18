@@ -3,7 +3,7 @@ import { eq, count, sql } from "drizzle-orm";
 import { db } from "../db";
 import { sessions, movies, voters, votes, inviteCodes } from "../db/schema";
 import { generateInviteCode } from "../lib/inviteCodes";
-import { getRequestURL } from "@tanstack/react-start/server";
+import { getRequestUrl } from "@tanstack/react-start/server";
 
 function requireAdmin(secret: string) {
   if (!secret || secret !== process.env.ADMIN_SECRET) {
@@ -93,7 +93,7 @@ export const adminCreateSession = createServerFn({ method: "POST" })
     }
 
     const session = await db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
-    const url = getRequestURL();
+    const url = getRequestUrl();
     const baseUrl = `${url.protocol}//${url.host}`;
 
     return {
@@ -341,7 +341,7 @@ export const adminGenerateCodes = createServerFn({ method: "POST" })
       codes.push(code);
     }
 
-    const url = getRequestURL();
+    const url = getRequestUrl();
     const baseUrl = `${url.protocol}//${url.host}`;
 
     return {

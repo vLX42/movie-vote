@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie, getRequestURL } from "@tanstack/react-start/server";
+import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { eq, and, count, sql } from "drizzle-orm";
 import { db } from "../db";
 import { sessions, movies, voters, votes } from "../db/schema";
@@ -105,7 +105,7 @@ export const getSession = createServerFn({ method: "GET" })
 
     const votesUsed = totalVotesUsed?.cnt ?? 0;
 
-    const url = getRequestURL();
+    const url = getRequestUrl();
     const baseUrl = `${url.protocol}//${url.host}`;
     const inviteUrl = voter.inviteCode ? `${baseUrl}/join/${voter.inviteCode}` : null;
 

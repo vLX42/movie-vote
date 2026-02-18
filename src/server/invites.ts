@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie, setCookie, getRequestURL } from "@tanstack/react-start/server";
+import { getCookie, setCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db";
 import { inviteCodes, voters, sessions } from "../db/schema";
@@ -53,7 +53,7 @@ export const claimInvite = createServerFn({ method: "POST" })
         .get();
 
       if (existingVoter) {
-        const url = getRequestURL();
+        const url = getRequestUrl();
         const baseUrl = `${url.protocol}//${url.host}`;
         const inviteUrl = existingVoter.inviteCode
           ? `${baseUrl}/join/${existingVoter.inviteCode}`
@@ -132,7 +132,7 @@ export const claimInvite = createServerFn({ method: "POST" })
       path: "/",
     });
 
-    const url = getRequestURL();
+    const url = getRequestUrl();
     const baseUrl = `${url.protocol}//${url.host}`;
     const inviteUrl = voterInviteCode ? `${baseUrl}/join/${voterInviteCode}` : null;
 
