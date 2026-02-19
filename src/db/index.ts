@@ -21,7 +21,10 @@ export const db = drizzle(
     }
     if (method === "get") {
       const row = stmt.get(...(params as [])) as Record<string, unknown> | undefined;
-      return { rows: row ? Object.values(row) : [] };
+      // Must return undefined (not []) when no row found.
+      // drizzle mapGetResult does `if (!row) return void 0` — an empty array []
+      // is truthy and would make drizzle return {id: undefined} instead of undefined.
+      return { rows: (row ? Object.values(row) : undefined) as unknown as [] };
     }
     // "all" and "values"
     const rows = (stmt.all(...(params as [])) as Record<string, unknown>[]).map(
