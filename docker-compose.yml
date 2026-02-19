@@ -1,6 +1,7 @@
 services:
   app:
-    build: .
+    image: ghcr.io/vlx42/movie-vote:latest
+    build: . # kept for local dev; ignored when pulling from registry
     ports:
       - "8090:3000"
     volumes:

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie, setCookie, getRequestUrl } from "@tanstack/react-start/server";
+import { getCookie, setCookie } from "@tanstack/react-start/server";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db";
 import { inviteCodes, voters, sessions } from "../db/schema";
@@ -38,15 +38,8 @@ export const claimInvite = createServerFn({ method: "POST" })
       throw new Error(`SESSION_CLOSED:${invite.sessionName}:${invite.sessionSlug}`);
     }
 
-    if (invite.status === "used") {
-      throw new Error("ALREADY_USED:This spot was already claimed.");
-    }
-
-    if (invite.status === "revoked") {
-      throw new Error("REVOKED:This invite link has been revoked.");
-    }
-
-    // Check if visitor already joined this session
+    // Check if visitor already joined this session — do this BEFORE the "used" check
+    // so revisiting your own join link works even after the code is consumed.
     const existingVoterId = getCookie("movienightapp_voter");
     if (existingVoterId) {
       const existingVoter = await db
@@ -56,12 +49,6 @@ export const claimInvite = createServerFn({ method: "POST" })
         .get();
 
       if (existingVoter) {
-        const url = getRequestUrl();
-        const baseUrl = `${url.protocol}//${url.host}`;
-        const inviteUrl = existingVoter.inviteCode
-          ? `${baseUrl}/join/${existingVoter.inviteCode}`
-          : null;
-
         return {
           success: true,
           alreadyJoined: true,
@@ -75,10 +62,17 @@ export const claimInvite = createServerFn({ method: "POST" })
             id: existingVoter.id,
             displayName: existingVoter.displayName,
             inviteSlotsRemaining: existingVoter.inviteSlotsRemaining,
-            inviteUrl,
           },
         };
       }
+    }
+
+    if (invite.status === "used") {
+      throw new Error("ALREADY_USED:This spot was already claimed.");
+    }
+
+    if (invite.status === "revoked") {
+      throw new Error("REVOKED:This invite link has been revoked.");
     }
 
     // Determine invite depth
