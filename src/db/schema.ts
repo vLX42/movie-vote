@@ -41,6 +41,7 @@ export const voters = sqliteTable("voters", {
   inviteCode: text("invite_code").unique(),
   inviteSlotsRemaining: integer("invite_slots_remaining").notNull().default(1),
   joinedAt: text("joined_at").notNull().default(sql`(datetime('now'))`),
+  fingerprint: text("fingerprint"),
 });
 
 export const inviteCodes = sqliteTable("invite_codes", {

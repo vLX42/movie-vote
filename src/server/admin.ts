@@ -142,6 +142,7 @@ export const adminGetSession = createServerFn({ method: "POST" })
         inviteCode: voters.inviteCode,
         inviteSlotsRemaining: voters.inviteSlotsRemaining,
         joinedAt: voters.joinedAt,
+        fingerprint: voters.fingerprint,
         voteCount: sql<number>`(SELECT COUNT(*) FROM votes WHERE voter_id = ${voters.id})`,
       })
       .from(voters)
@@ -203,6 +204,7 @@ export const adminGetTree = createServerFn({ method: "POST" })
         inviteDepth: voters.inviteDepth,
         inviteSlotsRemaining: voters.inviteSlotsRemaining,
         joinedAt: voters.joinedAt,
+        fingerprint: voters.fingerprint,
         voteCount: sql<number>`(SELECT COUNT(*) FROM votes WHERE voter_id = ${voters.id})`,
       })
       .from(voters)
@@ -220,6 +222,7 @@ export const adminGetTree = createServerFn({ method: "POST" })
       voteCount: number;
       inviteSlotsRemaining: number;
       joinedAt: string;
+      fingerprint: string | null;
       codes: { code: string; status: string }[];
       children: TreeNode[];
     };
@@ -238,6 +241,7 @@ export const adminGetTree = createServerFn({ method: "POST" })
             voteCount: voter.voteCount,
             inviteSlotsRemaining: voter.inviteSlotsRemaining,
             joinedAt: voter.joinedAt,
+            fingerprint: voter.fingerprint ?? null,
             codes: voterCodes,
             children: buildTree(voter.id),
           };

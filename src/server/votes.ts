@@ -47,6 +47,17 @@ export const castVote = createServerFn({ method: "POST" })
       throw new Error(`You have used all ${session.votesPerVoter} votes`);
     }
 
+    // Enforce max 1 vote per movie per voter
+    const existingMovieVote = await db
+      .select({ cnt: count() })
+      .from(votes)
+      .where(and(eq(votes.movieId, data.movieId), eq(votes.voterId, voterId)))
+      .get();
+
+    if ((existingMovieVote?.cnt ?? 0) >= 1) {
+      throw new Error("You have already voted for this movie");
+    }
+
     await db.insert(votes).values({
       id: crypto.randomUUID(),
       sessionId: session.id,

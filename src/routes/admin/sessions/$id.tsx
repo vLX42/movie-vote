@@ -284,6 +284,15 @@ function SessionManagerPage() {
                     <span className="label-mono text-dim">
                       depth {voter.inviteDepth} · joined {new Date(voter.joinedAt).toLocaleDateString()}
                     </span>
+                    {voter.fingerprint && (
+                      <span
+                        className="label-mono text-dim"
+                        title={`Device fingerprint: ${voter.fingerprint}`}
+                        style={{ fontSize: "0.72rem", letterSpacing: "0.04em" }}
+                      >
+                        device: {voter.fingerprint}
+                      </span>
+                    )}
                   </div>
                   <div className="admin-voter-row__stats">
                     <span className="label-mono">{voter.voteCount} votes cast</span>
@@ -449,6 +458,15 @@ function VoterNode({ voter }: { voter: any }) {
         >
           <span>{voter.displayName}</span>
           <span className="label-mono text-dim"> · {voter.voteCount} votes</span>
+          {voter.fingerprint && (
+            <span
+              className="label-mono text-dim"
+              title={`Device fingerprint: ${voter.fingerprint}`}
+              style={{ fontSize: "0.7rem", opacity: 0.7 }}
+            >
+              {" "}[{voter.fingerprint}]
+            </span>
+          )}
           {voter.children.length > 0 && (
             <span className="label-mono text-dim"> [{voter.children.length} invited]</span>
           )}

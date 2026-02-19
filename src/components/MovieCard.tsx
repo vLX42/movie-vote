@@ -29,7 +29,8 @@ export default function MovieCard({ movie, sessionSlug, voter, onVoteChange, ses
   const [localMyVotes, setLocalMyVotes] = useState(movie.myVotes);
   const [imageError, setImageError] = useState(false);
 
-  const canVote = sessionOpen && voter.votesRemaining > 0;
+  // Max 1 vote per movie: can only vote if not yet voted for this movie AND have votes remaining
+  const canVote = sessionOpen && voter.votesRemaining > 0 && localMyVotes === 0;
   const canUnvote = sessionOpen && localMyVotes > 0;
 
   // Sync from parent updates
@@ -117,31 +118,32 @@ export default function MovieCard({ movie, sessionSlug, voter, onVoteChange, ses
             <span className="movie-card__vote-count">{localVoteCount}</span>
             <span className="label-mono">votes</span>
             {localMyVotes > 0 && (
-              <span className="movie-card__my-votes label-mono">({localMyVotes} mine)</span>
+              <span className="movie-card__my-votes label-mono">(yours)</span>
             )}
           </div>
 
           {sessionOpen && (
             <div className="movie-card__vote-actions">
-              {localMyVotes > 0 && (
+              {localMyVotes > 0 ? (
                 <button
                   className="btn btn-sm movie-card__unvote-btn"
                   onClick={handleUnvote}
-                  disabled={loading || !canUnvote}
-                  title="Remove one vote"
+                  disabled={loading}
+                  title="Remove your vote"
                 >
-                  −
+                  ✓ Voted — Undo
                 </button>
+              ) : (
+                <motion.button
+                  className="btn btn-sm btn-primary movie-card__vote-btn"
+                  onClick={handleVote}
+                  disabled={loading || !canVote}
+                  whileTap={{ scale: 0.92 }}
+                  title={voter.votesRemaining > 0 ? "Cast a vote" : "No votes remaining"}
+                >
+                  + Vote
+                </motion.button>
               )}
-              <motion.button
-                className="btn btn-sm btn-primary movie-card__vote-btn"
-                onClick={handleVote}
-                disabled={loading || !canVote}
-                whileTap={{ scale: 0.92 }}
-                title={canVote ? "Cast a vote" : "No votes remaining"}
-              >
-                {localMyVotes > 0 ? `+1 (${localMyVotes})` : "+ Vote"}
-              </motion.button>
             </div>
           )}
         </div>

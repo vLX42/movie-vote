@@ -2,6 +2,8 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { claimInvite } from "../../server/invites";
+import { getBrowserFingerprint } from "../../utils/fingerprint";
+import { copyToClipboard } from "../../utils/clipboard";
 
 export const Route = createFileRoute("/join/$code")({
   component: JoinPage,
@@ -18,7 +20,8 @@ function JoinPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    claimInvite({ data: code })
+    getBrowserFingerprint()
+      .then((fingerprint) => claimInvite({ data: { code, fingerprint } }))
       .then((result) => {
         setSessionData({ name: result.session.name, slug: result.session.slug });
         setInviteUrl(result.voter.inviteUrl);
@@ -44,7 +47,7 @@ function JoinPage() {
 
   function copyInvite() {
     if (!inviteUrl) return;
-    navigator.clipboard.writeText(inviteUrl).then(() => {
+    copyToClipboard(inviteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

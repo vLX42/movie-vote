@@ -5,9 +5,12 @@ import { db } from "../db";
 import { inviteCodes, voters, sessions } from "../db/schema";
 import { generateInviteCode } from "../lib/inviteCodes";
 
+type ClaimInviteInput = { code: string; fingerprint?: string };
+
 export const claimInvite = createServerFn({ method: "POST" })
-  .inputValidator((code: string) => code)
-  .handler(async ({ data: code }) => {
+  .inputValidator((input: ClaimInviteInput) => input)
+  .handler(async ({ data }) => {
+    const { code, fingerprint = null } = data;
     const invite = await db
       .select({
         code: inviteCodes.code,
@@ -107,6 +110,7 @@ export const claimInvite = createServerFn({ method: "POST" })
       inviteDepth,
       inviteCode: voterInviteCode,
       inviteSlotsRemaining: invite.guestInviteSlots,
+      fingerprint,
     });
 
     await db
