@@ -145,17 +145,18 @@ success "Directory ready: $(dirname "$APPDATA_DIR")"
 header "Fetching application code"
 
 REPO_URL="https://github.com/vLX42/movie-vote.git"
+BRANCH="claude/movie-voting-app-4Spu1"
 
 if [[ "$IS_UPDATE" == true ]]; then
   info "Fetching latest code..."
   if [[ -d "$APPDATA_DIR/.git" ]]; then
-    # Fetch and hard-reset to avoid merge conflicts
+    # Fetch and hard-reset to the correct branch to avoid merge conflicts
     git -C "$APPDATA_DIR" fetch origin
-    git -C "$APPDATA_DIR" reset --hard origin/HEAD
+    git -C "$APPDATA_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
   else
     # No git repo — re-clone into temp and overlay source files
     TEMP_DIR="$(mktemp -d)"
-    git clone "$REPO_URL" "$TEMP_DIR"
+    git clone --branch "$BRANCH" "$REPO_URL" "$TEMP_DIR"
     # Sync source files; preserve .env and db/
     cp -r "$TEMP_DIR"/. "$APPDATA_DIR/"
     rm -rf "$TEMP_DIR"
@@ -166,7 +167,7 @@ else
   ask REPO_URL "GitHub repo URL" "$REPO_URL"
   # Clone into a temp dir then copy, so we can clone even if APPDATA_DIR already exists
   TEMP_DIR="$(mktemp -d)"
-  git clone "$REPO_URL" "$TEMP_DIR"
+  git clone --branch "$BRANCH" "$REPO_URL" "$TEMP_DIR"
   mkdir -p "$APPDATA_DIR"
   cp -r "$TEMP_DIR"/. "$APPDATA_DIR/"
   rm -rf "$TEMP_DIR"
