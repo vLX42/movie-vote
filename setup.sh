@@ -145,7 +145,7 @@ success "Directory ready: $(dirname "$APPDATA_DIR")"
 header "Fetching application code"
 
 REPO_URL="https://github.com/vLX42/movie-vote.git"
-BRANCH="claude/movie-voting-app-4Spu1"
+BRANCH="main"
 
 if [[ "$IS_UPDATE" == true ]]; then
   info "Fetching latest code..."
