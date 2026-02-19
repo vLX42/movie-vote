@@ -8,6 +8,8 @@ import {
   adminDeleteSession,
   adminGenerateCodes,
   adminRevokeCode,
+  adminReopenCode,
+  adminDeleteCode,
   adminRemoveVoter,
   adminAdjustInviteSlots,
 } from "../../../server/admin";
@@ -133,6 +135,30 @@ function SessionManagerPage() {
     if (!confirm(`Revoke invite code ${code}?`)) return;
     try {
       await adminRevokeCode({ data: { secret, code } });
+      setNewCodes((prev) => prev.filter((c) => c.code !== code));
+      loadData();
+    } catch (err: any) {
+      alert(err?.message);
+    }
+  }
+
+  async function reopenCode(code: string) {
+    if (!confirm(`Re-open invite code ${code}?\n\nThe code will be reset to "unused" so it can be used by someone new. The previous voter (if any) will remain in the session — remove them from the Voters tab if needed.`)) return;
+    try {
+      await adminReopenCode({ data: { secret, code } });
+      loadData();
+    } catch (err: any) {
+      alert(err?.message);
+    }
+  }
+
+  async function deleteCode(code: string, isUsed: boolean) {
+    const warning = isUsed
+      ? `Delete invite code ${code}?\n\nThis code was already used. The voter who joined with it and all their votes will also be removed.`
+      : `Delete invite code ${code}?`;
+    if (!confirm(warning)) return;
+    try {
+      await adminDeleteCode({ data: { secret, code } });
       setNewCodes((prev) => prev.filter((c) => c.code !== code));
       loadData();
     } catch (err: any) {
@@ -415,10 +441,23 @@ function SessionManagerPage() {
                       </>
                     )}
                     {code.status === "used" && (
-                      <span className="label-mono text-dim">
-                        used {code.usedAt ? new Date(code.usedAt).toLocaleDateString() : ""}
-                      </span>
+                      <>
+                        <span className="label-mono text-dim">
+                          used {code.usedAt ? new Date(code.usedAt).toLocaleDateString() : ""}
+                        </span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => reopenCode(code.code)}>
+                          Re-open
+                        </button>
+                      </>
                     )}
+                    {code.status === "revoked" && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => reopenCode(code.code)}>
+                        Re-open
+                      </button>
+                    )}
+                    <button className="btn btn-danger btn-sm" onClick={() => deleteCode(code.code, code.status === "used")}>
+                      Delete
+                    </button>
                   </div>
                 );
               })}

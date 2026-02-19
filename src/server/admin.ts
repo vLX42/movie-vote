@@ -295,6 +295,51 @@ export const adminRevokeCode = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+export const adminReopenCode = createServerFn({ method: "POST" })
+  .inputValidator((input: { secret: string; code: string }) => input)
+  .handler(async ({ data }) => {
+    requireAdmin(data.secret);
+
+    const invite = await db
+      .select()
+      .from(inviteCodes)
+      .where(eq(inviteCodes.code, data.code))
+      .get();
+
+    if (!invite) throw new Error("NOT_FOUND");
+
+    await db
+      .update(inviteCodes)
+      .set({ status: "unused", usedByVoterId: null, usedAt: null })
+      .where(eq(inviteCodes.code, data.code));
+
+    return { success: true };
+  });
+
+export const adminDeleteCode = createServerFn({ method: "POST" })
+  .inputValidator((input: { secret: string; code: string }) => input)
+  .handler(async ({ data }) => {
+    requireAdmin(data.secret);
+
+    const invite = await db
+      .select()
+      .from(inviteCodes)
+      .where(eq(inviteCodes.code, data.code))
+      .get();
+
+    if (!invite) throw new Error("NOT_FOUND");
+
+    // If the code was used, remove the voter and their votes
+    if (invite.usedByVoterId) {
+      await db.delete(votes).where(eq(votes.voterId, invite.usedByVoterId));
+      await db.delete(voters).where(eq(voters.id, invite.usedByVoterId));
+    }
+
+    await db.delete(inviteCodes).where(eq(inviteCodes.code, data.code));
+
+    return { success: true };
+  });
+
 export const adminRemoveVoter = createServerFn({ method: "POST" })
   .inputValidator((input: { secret: string; voterId: string }) => input)
   .handler(async ({ data }) => {
