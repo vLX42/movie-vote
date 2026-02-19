@@ -10,7 +10,6 @@
     "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
-    "@libsql/client": "^0.14.0",
     "@tanstack/react-router": "^1.120.0",
     "@tanstack/react-start": "^1.120.0",
     "dotenv": "^16.4.7",

@@ -1,6 +1,5 @@
-import "dotenv/config";
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
+import { DatabaseSync } from "node:sqlite";
+import { drizzle } from "drizzle-orm/sqlite-proxy";
 import * as schema from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -8,5 +7,27 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const client = createClient({ url: databaseUrl });
-export const db = drizzle({ client, schema });
+// Convert "file:/path" URL to a plain path for node:sqlite
+const dbPath = databaseUrl.startsWith("file:") ? databaseUrl.slice(5) : databaseUrl;
+
+const sqlite = new DatabaseSync(dbPath);
+
+export const db = drizzle(
+  async (sql, params, method) => {
+    const stmt = sqlite.prepare(sql);
+    if (method === "run") {
+      stmt.run(...(params as []));
+      return { rows: [] };
+    }
+    if (method === "get") {
+      const row = stmt.get(...(params as [])) as Record<string, unknown> | undefined;
+      return { rows: row ? Object.values(row) : [] };
+    }
+    // "all" and "values"
+    const rows = (stmt.all(...(params as [])) as Record<string, unknown>[]).map(
+      (r) => Object.values(r),
+    );
+    return { rows };
+  },
+  { schema },
+);
