@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { castVote, retractVote } from "../server/votes";
+import { removeMovie } from "../server/movies";
 import type { Movie } from "../server/sessions";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -18,13 +19,15 @@ const STATUS_CLASSES: Record<string, string> = {
 type Props = {
   movie: Movie;
   sessionSlug: string;
-  voter: { votesRemaining: number };
+  voter: { votesRemaining: number; id: string };
   onVoteChange: (result: { votesUsed: number; movie: { id: string; voteCount: number; myVotes: number } }) => void;
+  onMovieRemoved?: (movieId: string) => void;
   sessionOpen: boolean;
 };
 
-export default function MovieCard({ movie, sessionSlug, voter, onVoteChange, sessionOpen }: Props) {
+export default function MovieCard({ movie, sessionSlug, voter, onVoteChange, onMovieRemoved, sessionOpen }: Props) {
   const [loading, setLoading] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [localVoteCount, setLocalVoteCount] = useState(movie.voteCount);
   const [localMyVotes, setLocalMyVotes] = useState(movie.myVotes);
   const [imageError, setImageError] = useState(false);
@@ -32,6 +35,7 @@ export default function MovieCard({ movie, sessionSlug, voter, onVoteChange, ses
   // Max 1 vote per movie: can only vote if not yet voted for this movie AND have votes remaining
   const canVote = sessionOpen && voter.votesRemaining > 0 && localMyVotes === 0;
   const canUnvote = sessionOpen && localMyVotes > 0;
+  const canRemove = sessionOpen && movie.nominatedBy === voter.id;
 
   // Sync from parent updates
   if (movie.voteCount !== localVoteCount && !loading) setLocalVoteCount(movie.voteCount);
@@ -66,6 +70,20 @@ export default function MovieCard({ movie, sessionSlug, voter, onVoteChange, ses
       setLocalMyVotes((v) => v + 1);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRemove() {
+    if (!canRemove || removing) return;
+    if (!confirm(`Remove "${movie.title}" from the session?`)) return;
+    setRemoving(true);
+    try {
+      await removeMovie({ data: { slug: sessionSlug, movieId: movie.id } });
+      onMovieRemoved?.(movie.id);
+    } catch (err: any) {
+      alert(err?.message ?? "Failed to remove movie");
+    } finally {
+      setRemoving(false);
     }
   }
 
@@ -143,6 +161,16 @@ export default function MovieCard({ movie, sessionSlug, voter, onVoteChange, ses
                 >
                   + Vote
                 </motion.button>
+              )}
+              {canRemove && (
+                <button
+                  className="btn btn-sm movie-card__remove-btn"
+                  onClick={handleRemove}
+                  disabled={removing}
+                  title="Remove your nomination"
+                >
+                  {removing ? "…" : "Remove"}
+                </button>
               )}
             </div>
           )}

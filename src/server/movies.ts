@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { eq, and, or } from "drizzle-orm";
 import { db } from "../db";
-import { movies, voters, sessions } from "../db/schema";
+import { movies, voters, sessions, votes } from "../db/schema";
 
 type NominateInput = {
   slug: string;
@@ -76,6 +76,37 @@ export const nominateMovie = createServerFn({ method: "POST" })
     });
 
     return { success: true, movieId };
+  });
+
+export const removeMovie = createServerFn({ method: "POST" })
+  .inputValidator((input: { slug: string; movieId: string }) => input)
+  .handler(async ({ data }) => {
+    const voterId = getCookie("movienightapp_voter");
+    if (!voterId) throw new Error("UNAUTHORIZED");
+
+    const session = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.slug, data.slug))
+      .get();
+
+    if (!session) throw new Error("NOT_FOUND");
+    if (session.status !== "open") throw new Error("Session is not open");
+
+    const movie = await db
+      .select()
+      .from(movies)
+      .where(and(eq(movies.id, data.movieId), eq(movies.sessionId, session.id)))
+      .get();
+
+    if (!movie) throw new Error("NOT_FOUND");
+    if (movie.nominatedBy !== voterId) throw new Error("UNAUTHORIZED");
+
+    // Delete votes first (no FK cascade in schema)
+    await db.delete(votes).where(eq(votes.movieId, data.movieId));
+    await db.delete(movies).where(eq(movies.id, data.movieId));
+
+    return { success: true };
   });
 
 type RequestInput = {

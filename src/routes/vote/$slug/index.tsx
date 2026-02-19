@@ -2,13 +2,13 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { getSession } from "../../../server/sessions";
-import { createVoterInvite, setInviteCodeLabel } from "../../../server/voter-invites";
+import { createVoterInvite } from "../../../server/voter-invites";
 import MovieCard from "../../../components/MovieCard";
 import SearchBar from "../../../components/SearchBar";
 import VoteTokens from "../../../components/VoteTokens";
 import InviteLink from "../../../components/InviteLink";
 import LiveResults from "../../../components/LiveResults";
-import type { Movie, SessionData, VoterCode, Invitee } from "../../../server/sessions";
+import type { Movie, SessionData, Invitee, SessionInvite } from "../../../server/sessions";
 import { copyToClipboard } from "../../../utils/clipboard";
 
 export const Route = createFileRoute("/vote/$slug/")({
@@ -66,6 +66,14 @@ function VotingRoomPage() {
     router.invalidate();
   }, [router]);
 
+  const handleMovieRemoved = useCallback((movieId: string) => {
+    setOptimisticMovies((prev) => {
+      const base = prev ?? ("movies" in loaderData ? loaderData.movies : []);
+      return base.filter((m) => m.id !== movieId);
+    });
+    router.invalidate();
+  }, [loaderData, router]);
+
   if ("error" in loaderData) {
     if (loaderData.error === "UNAUTHORIZED") {
       return (
@@ -110,7 +118,7 @@ function VotingRoomPage() {
         </div>
         <div className="voting-header__right">
           <InviteLink
-            codesCreated={voter.voterCodes.length}
+            codesCreated={voter.sessionInvites.filter((i) => i.createdByCurrentVoter).length}
             totalSlots={voter.inviteSlotsRemaining}
             onOpen={() => setView("invites")}
           />
@@ -148,7 +156,7 @@ function VotingRoomPage() {
           >
             <span className="label-mono">Standings</span>
           </button>
-          {voter.inviteSlotsRemaining > 0 && (
+          {(voter.sessionInvites.length > 0 || voter.inviteSlotsRemaining > 0) && (
             <button
               className={`view-toggle__btn${view === "invites" ? " active" : ""}`}
               onClick={() => setView("invites")}
@@ -159,7 +167,7 @@ function VotingRoomPage() {
         </div>
         <span className="voting-room__count label-mono">
           {view === "invites"
-            ? `${voter.voterCodes.length}/${voter.inviteSlotsRemaining} links`
+            ? `${voter.sessionInvites.length} invite${voter.sessionInvites.length !== 1 ? "s" : ""}`
             : `${movies.length} film${movies.length !== 1 ? "s" : ""}`}
         </span>
       </div>
@@ -183,6 +191,7 @@ function VotingRoomPage() {
                     sessionSlug={slug}
                     voter={voterForCards}
                     onVoteChange={handleVoteChange}
+                    onMovieRemoved={handleMovieRemoved}
                     sessionOpen={isOpen}
                   />
                 ))}
@@ -219,40 +228,12 @@ function InvitesView({
   voter: SessionData["voter"];
   onRefresh: () => void;
 }) {
-  const [editingCode, setEditingCode] = useState<string | null>(null);
-  const [labelDraft, setLabelDraft] = useState("");
-  const [savingLabel, setSavingLabel] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [localCodes, setLocalCodes] = useState<VoterCode[]>(voter.voterCodes);
 
-  // Sync from parent when voter data refreshes
-  useEffect(() => {
-    setLocalCodes(voter.voterCodes);
-  }, [voter.voterCodes]);
-
-  const canCreate = localCodes.length < voter.inviteSlotsRemaining;
-
-  function startEdit(code: VoterCode) {
-    setEditingCode(code.code);
-    setLabelDraft(code.label ?? "");
-  }
-
-  async function saveLabel(code: string) {
-    setSavingLabel(true);
-    try {
-      await setInviteCodeLabel({ data: { code, label: labelDraft } });
-      setLocalCodes((prev) =>
-        prev.map((c) => (c.code === code ? { ...c, label: labelDraft.trim() || null } : c))
-      );
-      setEditingCode(null);
-    } catch {
-      // keep editing on error
-    } finally {
-      setSavingLabel(false);
-    }
-  }
+  const myInviteCount = voter.sessionInvites.filter((i) => i.createdByCurrentVoter).length;
+  const canCreate = voter.inviteSlotsRemaining > 0 && myInviteCount < voter.inviteSlotsRemaining;
 
   async function handleCopy(url: string, code: string) {
     await copyToClipboard(url);
@@ -261,14 +242,11 @@ function InvitesView({
   }
 
   async function handleCreate() {
-    if (!canCreate || creating) return;
+    const trimmedLabel = newLabel.trim();
+    if (!trimmedLabel || !canCreate || creating) return;
     setCreating(true);
     try {
-      const res = await createVoterInvite({ data: { label: newLabel.trim() || undefined } });
-      setLocalCodes((prev) => [
-        ...prev,
-        { code: res.code, label: res.label ?? null, status: "unused", url: res.url },
-      ]);
+      await createVoterInvite({ data: { label: trimmedLabel } });
       setNewLabel("");
       onRefresh();
     } catch (err: any) {
@@ -278,99 +256,68 @@ function InvitesView({
     }
   }
 
+  const statusBadgeClass = (status: string) =>
+    status === "unused" ? "badge-library" : status === "used" ? "badge-nominated" : "badge-requested";
+
   return (
     <div className="invites-view">
       <div>
-        <p className="invites-section__title">Your Invite Links</p>
+        <p className="invites-section__title">All Invites</p>
 
-        {localCodes.length === 0 && (
+        {voter.sessionInvites.length === 0 && (
           <p className="label-mono" style={{ color: "var(--text-dim)", marginBottom: "0.75rem" }}>
-            No invite links created yet.
+            No invites created yet.
           </p>
         )}
 
-        {localCodes.map((code) => (
-          <div key={code.code} className="invite-code-row">
-            {editingCode === code.code ? (
-              <>
-                <input
-                  className="invite-code-row__label-input"
-                  value={labelDraft}
-                  onChange={(e) => setLabelDraft(e.target.value)}
-                  placeholder="Name for this link..."
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveLabel(code.code);
-                    if (e.key === "Escape") setEditingCode(null);
-                  }}
-                  autoFocus
-                />
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => saveLabel(code.code)}
-                  disabled={savingLabel}
-                >
-                  Save
-                </button>
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => setEditingCode(null)}
-                >
-                  ✕
-                </button>
-              </>
-            ) : (
-              <>
-                <span className={`invite-code-row__label${!code.label ? " invite-code-row__label--empty" : ""}`}>
-                  {code.label || code.code}
+        {voter.sessionInvites.map((invite: SessionInvite, idx: number) => (
+          <div key={invite.code ?? `invite-${idx}`} className="invite-code-row">
+            <span className="invite-code-row__label">
+              {invite.label}
+              {invite.createdByCurrentVoter && (
+                <span className="label-mono" style={{ color: "var(--accent-teal)", marginLeft: "0.4rem", fontSize: "0.7rem" }}>
+                  (yours)
                 </span>
-                <span className={`badge ${code.status === "unused" ? "badge-library" : code.status === "used" ? "badge-nominated" : "badge-requested"}`}>
-                  {code.status}
-                </span>
-                {code.status === "unused" && (
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => handleCopy(code.url, code.code)}
-                  >
-                    {copiedCode === code.code ? (
-                      <span className="invite-copied-text">✓ Copied</span>
-                    ) : (
-                      "Copy Link"
-                    )}
-                  </button>
+              )}
+            </span>
+            <span className={`badge ${statusBadgeClass(invite.status)}`}>
+              {invite.status}
+            </span>
+            {invite.createdByCurrentVoter && invite.status === "unused" && invite.url && (
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => handleCopy(invite.url!, invite.code!)}
+              >
+                {copiedCode === invite.code ? (
+                  <span className="invite-copied-text">✓ Copied</span>
+                ) : (
+                  "Copy Link"
                 )}
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => startEdit(code)}
-                  title="Edit name"
-                  style={{ fontSize: "0.7rem" }}
-                >
-                  Edit name
-                </button>
-              </>
+              </button>
             )}
           </div>
         ))}
 
         {canCreate && (
-          <div className="invite-create-row">
+          <div className="invite-create-row" style={{ marginTop: "1rem" }}>
             <input
               className="invite-create-row__input"
-              placeholder="Name for this link (optional)..."
+              placeholder="Name for this invite (required)…"
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) handleCreate(); }}
             />
             <button
               className="btn btn-sm btn-primary"
               onClick={handleCreate}
-              disabled={creating}
+              disabled={creating || !newLabel.trim()}
             >
               {creating ? "Creating…" : "+ Create Link"}
             </button>
           </div>
         )}
 
-        {!canCreate && localCodes.length > 0 && (
+        {!canCreate && voter.inviteSlotsRemaining > 0 && myInviteCount >= voter.inviteSlotsRemaining && (
           <p className="label-mono" style={{ color: "var(--text-dim)", marginTop: "0.5rem", fontSize: "0.75rem" }}>
             All {voter.inviteSlotsRemaining} invite link{voter.inviteSlotsRemaining !== 1 ? "s" : ""} created.
           </p>

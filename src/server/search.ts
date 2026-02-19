@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
+import { isMockMode, filterMockMovies } from "./mock-media";
 
 function requireVoter() {
   const voterId = getCookie("movienightapp_voter");
@@ -13,6 +14,10 @@ export const searchJellyfin = createServerFn({ method: "POST" })
     requireVoter();
 
     if (!q || q.length < 2) throw new Error("Query must be at least 2 characters");
+
+    if (isMockMode()) {
+      return { results: filterMockMovies(q) };
+    }
 
     const jellyfinUrl = process.env.JELLYFIN_URL;
     const jellyfinKey = process.env.JELLYFIN_API_KEY;
@@ -55,6 +60,10 @@ export const searchTmdb = createServerFn({ method: "POST" })
     requireVoter();
 
     if (!q || q.length < 2) throw new Error("Query must be at least 2 characters");
+
+    if (isMockMode()) {
+      return { results: filterMockMovies(q) };
+    }
 
     const jellyseerrUrl = process.env.JELLYSEERR_URL;
     const jellyseerrKey = process.env.JELLYSEERR_API_KEY;

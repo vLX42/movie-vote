@@ -30,6 +30,14 @@ export type VoterCode = {
   url: string;
 };
 
+export type SessionInvite = {
+  label: string;
+  status: string;
+  code: string | null;
+  url: string | null;
+  createdByCurrentVoter: boolean;
+};
+
 export type Invitee = {
   id: string;
   displayName: string | null;
@@ -56,6 +64,7 @@ export type SessionData = {
     inviteUrl: string | null;
     voterCodes: VoterCode[];
     invitees: Invitee[];
+    sessionInvites: SessionInvite[];
   };
   movies: Movie[];
 };
@@ -165,6 +174,30 @@ export const getSession = createServerFn({ method: "GET" })
       joinedAt: i.joinedAt,
     }));
 
+    // Fetch all invite codes for the session (to show all invite names to all voters)
+    const allCodeRows = await db
+      .select({
+        code: inviteCodes.code,
+        label: inviteCodes.label,
+        status: inviteCodes.status,
+        createdByVoterId: inviteCodes.createdByVoterId,
+      })
+      .from(inviteCodes)
+      .where(eq(inviteCodes.sessionId, session.id));
+
+    const sessionInvites: SessionInvite[] = allCodeRows
+      .filter((c) => c.label !== null)
+      .map((c) => {
+        const isOwner = c.createdByVoterId === voterId;
+        return {
+          label: c.label!,
+          status: c.status,
+          code: isOwner ? c.code : null,
+          url: isOwner ? `${baseUrl}/join/${c.code}` : null,
+          createdByCurrentVoter: isOwner,
+        };
+      });
+
     const inviteUrl = voter.inviteCode ? `${baseUrl}/join/${voter.inviteCode}` : null;
 
     return {
@@ -187,6 +220,7 @@ export const getSession = createServerFn({ method: "GET" })
         inviteUrl,
         voterCodes,
         invitees,
+        sessionInvites,
       },
       movies: moviesWithVotes,
     };

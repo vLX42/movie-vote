@@ -45,6 +45,7 @@ type CreateSessionInput = {
   slug: string;
   votesPerVoter?: number;
   rootInviteCodes?: number;
+  rootInviteLabel?: string;
   guestInviteSlots?: number;
   maxInviteDepth?: number | null;
   allowJellyseerrRequests?: boolean;
@@ -57,8 +58,9 @@ export const adminCreateSession = createServerFn({ method: "POST" })
     requireAdmin(data.secret);
 
     const { name, slug, votesPerVoter = 5, rootInviteCodes = 1,
-      guestInviteSlots = 1, maxInviteDepth = null,
+      rootInviteLabel, guestInviteSlots = 1, maxInviteDepth = null,
       allowJellyseerrRequests = true, expiresAt = null } = data;
+    const resolvedRootLabel = rootInviteLabel?.trim() || "Admin";
 
     if (!name || !slug) throw new Error("name and slug are required");
     if (!/^[a-z0-9-]+$/.test(slug)) throw new Error("slug must be lowercase alphanumeric with hyphens only");
@@ -88,6 +90,7 @@ export const adminCreateSession = createServerFn({ method: "POST" })
         sessionId,
         createdByVoterId: null,
         status: "unused",
+        label: resolvedRootLabel,
       });
       codes.push(code);
     }
@@ -343,9 +346,12 @@ export const adminDeleteSession = createServerFn({ method: "POST" })
   });
 
 export const adminGenerateCodes = createServerFn({ method: "POST" })
-  .inputValidator((input: { secret: string; sessionId: string; count: number }) => input)
+  .inputValidator((input: { secret: string; sessionId: string; count: number; label: string }) => input)
   .handler(async ({ data }) => {
     requireAdmin(data.secret);
+
+    const label = data.label.trim();
+    if (!label) throw new Error("A name for the invite code is required");
 
     const session = await db.select().from(sessions).where(eq(sessions.id, data.sessionId)).get();
     if (!session) throw new Error("NOT_FOUND");
@@ -360,6 +366,7 @@ export const adminGenerateCodes = createServerFn({ method: "POST" })
         sessionId: session.id,
         createdByVoterId: null,
         status: "unused",
+        label,
       });
       codes.push(code);
     }

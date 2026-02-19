@@ -6,10 +6,13 @@ import { inviteCodes, voters } from "../db/schema";
 import { generateInviteCode } from "../lib/inviteCodes";
 
 export const createVoterInvite = createServerFn({ method: "POST" })
-  .inputValidator((input: { label?: string }) => input)
+  .inputValidator((input: { label: string }) => input)
   .handler(async ({ data }) => {
     const voterId = getCookie("movienightapp_voter");
     if (!voterId) throw new Error("UNAUTHORIZED");
+
+    const label = data.label.trim();
+    if (!label) throw new Error("A name for this invite is required");
 
     const voter = await db.select().from(voters).where(eq(voters.id, voterId)).get();
     if (!voter) throw new Error("UNAUTHORIZED");
@@ -25,7 +28,6 @@ export const createVoterInvite = createServerFn({ method: "POST" })
     }
 
     const code = generateInviteCode();
-    const label = data.label?.trim() || null;
 
     await db.insert(inviteCodes).values({
       code,

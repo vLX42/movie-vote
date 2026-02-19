@@ -112,9 +112,15 @@ function SessionManagerPage() {
   }
 
   async function generateMoreCodes(count: number) {
+    const label = window.prompt("Enter a name/label for this invite code:");
+    if (label === null) return; // user cancelled
+    if (!label.trim()) {
+      alert("A name is required for invite codes.");
+      return;
+    }
     setCodeError(null);
     try {
-      const res = await adminGenerateCodes({ data: { secret, sessionId: id, count } });
+      const res = await adminGenerateCodes({ data: { secret, sessionId: id, count, label: label.trim() } });
       setNewCodes(res.codes);
       setActiveTab("codes");
       loadData();
@@ -390,6 +396,9 @@ function SessionManagerPage() {
                     style={isNew ? { outline: "1px solid var(--accent-teal)", borderRadius: 4 } : undefined}
                   >
                     <code className="admin-code-row__code">{code.code}</code>
+                    {code.label && (
+                      <span className="label-mono text-dim" style={{ fontStyle: "italic" }}>{code.label}</span>
+                    )}
                     <span className={`badge ${code.status === "unused" ? "badge-library" : code.status === "used" ? "badge-nominated" : "badge-requested"}`}>
                       {code.status}
                     </span>

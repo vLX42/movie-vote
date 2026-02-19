@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { isMockMode } from "../../../../server/mock-media";
 
 export const Route = createFileRoute("/api/images/jellyfin/$id")({
   server: {
@@ -7,8 +8,8 @@ export const Route = createFileRoute("/api/images/jellyfin/$id")({
         const jellyfinUrl = process.env.JELLYFIN_URL;
         const jellyfinKey = process.env.JELLYFIN_API_KEY;
 
-        if (!jellyfinUrl || !jellyfinKey) {
-          return new Response("Jellyfin not configured", { status: 503 });
+        if (isMockMode() || !jellyfinUrl || !jellyfinKey) {
+          return new Response(null, { status: 404 });
         }
 
         try {
