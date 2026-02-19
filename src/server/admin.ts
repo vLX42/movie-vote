@@ -324,6 +324,24 @@ export const adminRemoveVoter = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+export const adminDeleteSession = createServerFn({ method: "POST" })
+  .inputValidator((input: { secret: string; id: string }) => input)
+  .handler(async ({ data }) => {
+    requireAdmin(data.secret);
+
+    const session = await db.select().from(sessions).where(eq(sessions.id, data.id)).get();
+    if (!session) throw new Error("NOT_FOUND");
+
+    // Manual cascade (no FK CASCADE in schema): votes → invite_codes → voters → movies → sessions
+    await db.delete(votes).where(eq(votes.sessionId, data.id));
+    await db.delete(inviteCodes).where(eq(inviteCodes.sessionId, data.id));
+    await db.delete(voters).where(eq(voters.sessionId, data.id));
+    await db.delete(movies).where(eq(movies.sessionId, data.id));
+    await db.delete(sessions).where(eq(sessions.id, data.id));
+
+    return { success: true };
+  });
+
 export const adminGenerateCodes = createServerFn({ method: "POST" })
   .inputValidator((input: { secret: string; sessionId: string; count: number }) => input)
   .handler(async ({ data }) => {

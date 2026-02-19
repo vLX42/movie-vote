@@ -266,6 +266,21 @@ img { display: block; max-width: 100%; }
 .live-results__count { font-family: var(--font-title); font-size: 1.3rem; color: var(--accent-teal); width: 2rem; text-align: right; flex-shrink: 0; }
 .live-results__winner-badge { color: var(--accent-yellow); font-size: 0.6rem; }
 
+/* ============================================================ INVITES VIEW ============================================================ */
+.invites-view { display: flex; flex-direction: column; gap: 2rem; max-width: 640px; margin: 0 auto; padding: 0 1rem 2rem; }
+.invites-section__title { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.75rem; }
+.invite-code-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.75rem; background: var(--bg-card); border: 1px solid var(--border); margin-bottom: 0.5rem; flex-wrap: wrap; }
+.invite-code-row__label { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite-code-row__label--empty { color: var(--text-dim); }
+.invite-code-row__label-input { flex: 1; min-width: 100px; background: var(--bg-raised); border: 1px solid var(--accent-teal); color: var(--text-primary); font-family: var(--font-mono); font-size: 0.85rem; padding: 0.2rem 0.5rem; outline: none; }
+.invite-create-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.25rem; flex-wrap: wrap; }
+.invite-create-row__input { flex: 1; min-width: 140px; background: var(--bg-raised); border: 1px solid var(--border); color: var(--text-primary); font-family: var(--font-mono); font-size: 0.85rem; padding: 0.4rem 0.75rem; outline: none; }
+.invite-create-row__input:focus { border-color: var(--accent-teal); }
+.invitee-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: var(--bg-card); border: 1px solid var(--border); margin-bottom: 0.4rem; }
+.invitee-row__name { flex: 1; font-family: var(--font-title); font-size: 1rem; color: var(--text-primary); }
+.invitee-row__date { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); }
+.invite-copied-text { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-teal); }
+
 /* ============================================================ JOIN PAGE ============================================================ */
 .join-loading__tape { width: 60px; height: 60px; border: 2px solid var(--border); border-top-color: var(--accent-teal); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
 @keyframes spin { to { transform: rotate(360deg); } }

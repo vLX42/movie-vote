@@ -50,6 +50,7 @@ export const inviteCodes = sqliteTable("invite_codes", {
   createdByVoterId: text("created_by_voter_id"),
   usedByVoterId: text("used_by_voter_id"),
   status: text("status").notNull().default("unused"),
+  label: text("label"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   usedAt: text("used_at"),
 });

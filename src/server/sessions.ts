@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db";
-import { sessions, movies, voters, votes } from "../db/schema";
+import { sessions, movies, voters, votes, inviteCodes } from "../db/schema";
 
 export type Movie = {
   id: string;
@@ -23,6 +23,19 @@ export type Movie = {
   myVotes: number;
 };
 
+export type VoterCode = {
+  code: string;
+  label: string | null;
+  status: string;
+  url: string;
+};
+
+export type Invitee = {
+  id: string;
+  displayName: string | null;
+  joinedAt: string;
+};
+
 export type SessionData = {
   session: {
     id: string;
@@ -41,6 +54,8 @@ export type SessionData = {
     votesRemaining: number;
     inviteSlotsRemaining: number;
     inviteUrl: string | null;
+    voterCodes: VoterCode[];
+    invitees: Invitee[];
   };
   movies: Movie[];
 };
@@ -72,6 +87,9 @@ export const getSession = createServerFn({ method: "GET" })
     if (!voter) {
       throw new Error("UNAUTHORIZED");
     }
+
+    const url = getRequestUrl();
+    const baseUrl = `${url.protocol}//${url.host}`;
 
     // Fetch movies and all votes for the session separately,
     // then join in JS — avoids count()/subquery mapping issues with sqlite-proxy
@@ -122,8 +140,31 @@ export const getSession = createServerFn({ method: "GET" })
       }))
       .sort((a, b) => b.voteCount - a.voteCount || a.createdAt.localeCompare(b.createdAt));
 
-    const url = getRequestUrl();
-    const baseUrl = `${url.protocol}//${url.host}`;
+    // Fetch all invite codes created by this voter
+    const voterCodeRows = await db
+      .select({ code: inviteCodes.code, label: inviteCodes.label, status: inviteCodes.status })
+      .from(inviteCodes)
+      .where(eq(inviteCodes.createdByVoterId, voterId));
+
+    const voterCodes: VoterCode[] = voterCodeRows.map((c) => ({
+      code: c.code,
+      label: c.label ?? null,
+      status: c.status,
+      url: `${baseUrl}/join/${c.code}`,
+    }));
+
+    // Fetch voters invited by this voter (people who have actually joined)
+    const inviteeRows = await db
+      .select({ id: voters.id, displayName: voters.displayName, joinedAt: voters.joinedAt })
+      .from(voters)
+      .where(eq(voters.invitedBy, voterId));
+
+    const invitees: Invitee[] = inviteeRows.map((i) => ({
+      id: i.id,
+      displayName: i.displayName,
+      joinedAt: i.joinedAt,
+    }));
+
     const inviteUrl = voter.inviteCode ? `${baseUrl}/join/${voter.inviteCode}` : null;
 
     return {
@@ -144,6 +185,8 @@ export const getSession = createServerFn({ method: "GET" })
         votesRemaining: session.votesPerVoter - votesUsed,
         inviteSlotsRemaining: voter.inviteSlotsRemaining,
         inviteUrl,
+        voterCodes,
+        invitees,
       },
       movies: moviesWithVotes,
     };

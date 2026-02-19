@@ -1,10 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { copyToClipboard } from "../../../utils/clipboard";
 import {
   adminGetSession,
   adminGetTree,
   adminCloseSession,
+  adminDeleteSession,
   adminGenerateCodes,
   adminRevokeCode,
   adminRemoveVoter,
@@ -37,6 +38,7 @@ function CopyButton({ text, label = "Copy Link" }: { text: string; label?: strin
 function SessionManagerPage() {
   const { id } = Route.useParams();
   const secret = getAdminSecret();
+  const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [treeData, setTreeData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +156,16 @@ function SessionManagerPage() {
     }
   }
 
+  async function deleteSession() {
+    if (!confirm(`Delete session "${session.name}"? This cannot be undone and will remove all voters, movies, and votes.`)) return;
+    try {
+      await adminDeleteSession({ data: { secret, id } });
+      navigate({ to: "/admin" });
+    } catch (err: any) {
+      alert(err?.message ?? "Failed to delete session");
+    }
+  }
+
   const winnerMovie = session.winnerMovieId ? movies.find((m: any) => m.id === session.winnerMovieId) : null;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -197,6 +209,9 @@ function SessionManagerPage() {
             >
               Open Room ↗
             </Link>
+            <button className="btn btn-danger btn-sm" onClick={deleteSession}>
+              Delete Session
+            </button>
           </div>
 
           {codeError && (

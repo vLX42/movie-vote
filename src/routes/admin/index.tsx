@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
-import { adminListSessions } from "../../server/admin";
+import { adminListSessions, adminDeleteSession } from "../../server/admin";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminDashboard,
@@ -125,7 +125,7 @@ function AdminDashboard() {
 
         <div className="session-list">
           {sessions.map((session) => (
-            <SessionCard key={session.id} session={session} />
+            <SessionCard key={session.id} session={session} secret={secret} onDeleted={loadSessions} />
           ))}
         </div>
       </div>
@@ -133,9 +133,22 @@ function AdminDashboard() {
   );
 }
 
-function SessionCard({ session }: { session: any }) {
+function SessionCard({ session, secret, onDeleted }: { session: any; secret: string; onDeleted: () => void }) {
+  const [deleting, setDeleting] = useState(false);
   const statusClass =
     session.status === "open" ? "badge-library" : session.status === "closed" ? "badge-requested" : "badge-nominated";
+
+  async function handleDelete() {
+    if (!confirm(`Delete session "${session.name}"? This cannot be undone and will remove all voters, movies, and votes.`)) return;
+    setDeleting(true);
+    try {
+      await adminDeleteSession({ data: { secret, id: session.id } });
+      onDeleted();
+    } catch (err: any) {
+      alert(err?.message ?? "Failed to delete session");
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="session-card">
@@ -170,9 +183,18 @@ function SessionCard({ session }: { session: any }) {
         <span className="label-mono text-dim">
           Created {new Date(session.createdAt).toLocaleDateString()}
         </span>
-        <Link to="/admin/sessions/$id" params={{ id: session.id }} className="btn btn-secondary btn-sm">
-          Manage →
-        </Link>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button
+            className="btn btn-danger btn-sm"
+            onClick={handleDelete}
+            disabled={deleting}
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+          <Link to="/admin/sessions/$id" params={{ id: session.id }} className="btn btn-secondary btn-sm">
+            Manage →
+          </Link>
+        </div>
       </div>
     </div>
   );
