@@ -12,10 +12,15 @@ export default defineConfig({
     tsConfigPaths(),
     tanstackStart(),
     nitro({
+      // noExternals: false enables Nitro's file tracer (nf3/@vercel/nft) to copy
+      // external packages (including native binaries) into .output/server/node_modules/.
+      // Without this, Nitro forces noExternal:true at build time which bundles
+      // EVERYTHING — including @libsql/client whose native .node binary cannot be
+      // handled by Rollup's commonjs shim.
+      noExternals: false,
       externals: {
-        // @libsql/client loads its native binary (e.g. @libsql/linux-x64-gnu)
-        // via a dynamic require() that Rollup/commonjs cannot bundle.
-        // Mark it external so Node.js resolves it at runtime from node_modules.
+        // Ensure @libsql/client and libsql (native binary loader) are traced and
+        // copied to .output/server/node_modules/ rather than inlined.
         external: ["@libsql/client", "libsql"],
       },
     }),
