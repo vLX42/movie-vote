@@ -19,6 +19,20 @@ function getAdminSecret() {
   return localStorage.getItem("movienightapp_admin_secret") ?? "";
 }
 
+function CopyButton({ text, label = "Copy Link" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  async function handleCopy() {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+  return (
+    <button className={`btn btn-secondary btn-sm${copied ? " btn-copied" : ""}`} onClick={handleCopy}>
+      {copied ? "✓ Copied!" : label}
+    </button>
+  );
+}
+
 function SessionManagerPage() {
   const { id } = Route.useParams();
   const secret = getAdminSecret();
@@ -26,6 +40,9 @@ function SessionManagerPage() {
   const [treeData, setTreeData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [newCodes, setNewCodes] = useState<{ code: string; url: string }[]>([]);
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [editingSlots, setEditingSlots] = useState<{ voterId: string; value: string } | null>(null);
 
   if (!secret) {
     return (
@@ -92,12 +109,14 @@ function SessionManagerPage() {
   }
 
   async function generateMoreCodes(count: number) {
+    setCodeError(null);
     try {
       const res = await adminGenerateCodes({ data: { secret, sessionId: id, count } });
-      alert(`Generated ${res.codes.length} new code(s):\n${res.codes.map((c: any) => c.url).join("\n")}`);
+      setNewCodes(res.codes);
+      setActiveTab("codes");
       loadData();
     } catch (err: any) {
-      alert(err?.message);
+      setCodeError(err?.message ?? "Failed to generate code");
     }
   }
 
@@ -105,6 +124,7 @@ function SessionManagerPage() {
     if (!confirm(`Revoke invite code ${code}?`)) return;
     try {
       await adminRevokeCode({ data: { secret, code } });
+      setNewCodes((prev) => prev.filter((c) => c.code !== code));
       loadData();
     } catch (err: any) {
       alert(err?.message);
@@ -121,13 +141,12 @@ function SessionManagerPage() {
     }
   }
 
-  async function adjustSlots(voterId: string, current: number) {
-    const newSlots = prompt(`Current slots: ${current}\nNew invite slots:`, String(current));
-    if (newSlots === null) return;
+  async function saveSlots(voterId: string, value: string) {
+    const n = parseInt(value, 10);
+    if (isNaN(n) || n < 0) return;
     try {
-      await adminAdjustInviteSlots({
-        data: { secret, voterId, inviteSlotsRemaining: parseInt(newSlots) },
-      });
+      await adminAdjustInviteSlots({ data: { secret, voterId, inviteSlotsRemaining: n } });
+      setEditingSlots(null);
       loadData();
     } catch (err: any) {
       alert(err?.message);
@@ -135,6 +154,7 @@ function SessionManagerPage() {
   }
 
   const winnerMovie = session.winnerMovieId ? movies.find((m: any) => m.id === session.winnerMovieId) : null;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
     <div className="admin-page">
@@ -162,7 +182,10 @@ function SessionManagerPage() {
                 Close Voting
               </button>
             )}
-            <button className="btn btn-secondary btn-sm" onClick={() => generateMoreCodes(1)}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => generateMoreCodes(1)}
+            >
               + Invite Code
             </button>
             <Link
@@ -174,6 +197,12 @@ function SessionManagerPage() {
               Open Room ↗
             </Link>
           </div>
+
+          {codeError && (
+            <p className="label-mono text-danger" style={{ marginTop: "0.5rem" }}>
+              {codeError}
+            </p>
+          )}
         </div>
 
         {winnerMovie && (
@@ -257,15 +286,36 @@ function SessionManagerPage() {
                   </div>
                   <div className="admin-voter-row__stats">
                     <span className="label-mono">{voter.voteCount} votes cast</span>
-                    <span className="label-mono text-dim">{voter.inviteSlotsRemaining} invite slots</span>
+                    {editingSlots?.voterId === voter.id ? (
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <input
+                          type="number"
+                          min={0}
+                          className="slots-input"
+                          value={editingSlots.value}
+                          onChange={(e) => setEditingSlots({ voterId: voter.id, value: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveSlots(voter.id, editingSlots.value);
+                            if (e.key === "Escape") setEditingSlots(null);
+                          }}
+                          autoFocus
+                          style={{ width: "4rem", padding: "0.2rem 0.4rem", background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 4, color: "inherit", fontFamily: "var(--font-mono)", fontSize: "0.85rem" }}
+                        />
+                        <span className="label-mono text-dim">slots</span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => saveSlots(voter.id, editingSlots.value)}>Save</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setEditingSlots(null)}>✕</button>
+                      </span>
+                    ) : (
+                      <button
+                        className="label-mono text-dim"
+                        style={{ background: "none", border: "none", cursor: "pointer", textDecoration: "underline dotted" }}
+                        onClick={() => setEditingSlots({ voterId: voter.id, value: String(voter.inviteSlotsRemaining) })}
+                      >
+                        {voter.inviteSlotsRemaining} invite slots
+                      </button>
+                    )}
                   </div>
                   <div className="admin-voter-row__actions">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => adjustSlots(voter.id, voter.inviteSlotsRemaining)}
-                    >
-                      Adjust Slots
-                    </button>
                     <button
                       className="btn btn-danger btn-sm"
                       onClick={() => removeVoter(voter.id, voter.displayName || voter.id.slice(0, 8))}
@@ -281,29 +331,63 @@ function SessionManagerPage() {
 
         {activeTab === "codes" && (
           <div className="panel">
-            <h3 className="panel-title">Invite Codes ({codes.length})</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <h3 className="panel-title" style={{ margin: 0 }}>Invite Codes ({codes.length})</h3>
+              <button className="btn btn-secondary btn-sm" onClick={() => generateMoreCodes(1)}>
+                + Generate Code
+              </button>
+            </div>
+
+            {newCodes.length > 0 && (
+              <div style={{ marginBottom: "1.25rem", padding: "0.75rem 1rem", background: "color-mix(in srgb, var(--accent-teal) 10%, transparent)", border: "1px solid var(--accent-teal)", borderRadius: 6 }}>
+                <p className="label-mono" style={{ marginBottom: "0.5rem", color: "var(--accent-teal)" }}>
+                  ✓ New {newCodes.length === 1 ? "code" : "codes"} ready — share {newCodes.length === 1 ? "this link" : "these links"}:
+                </p>
+                {newCodes.map((c) => (
+                  <div key={c.code} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "0.4rem", flexWrap: "wrap" }}>
+                    <code className="label-mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.url}
+                    </code>
+                    <CopyButton text={c.url} />
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="admin-code-list">
-              {codes.map((code: any) => (
-                <div key={code.code} className="admin-code-row">
-                  <code className="admin-code-row__code">{code.code}</code>
-                  <span className={`badge ${code.status === "unused" ? "badge-library" : code.status === "used" ? "badge-nominated" : "badge-requested"}`}>
-                    {code.status}
-                  </span>
-                  <span className="label-mono text-dim">
-                    {code.createdByVoterId ? "guest code" : "root code"}
-                  </span>
-                  {code.status === "unused" && (
-                    <button className="btn btn-danger btn-sm" onClick={() => revokeCode(code.code)}>
-                      Revoke
-                    </button>
-                  )}
-                  {code.status === "used" && (
-                    <span className="label-mono text-dim">
-                      used {code.usedAt ? new Date(code.usedAt).toLocaleDateString() : ""}
+              {codes.map((code: any) => {
+                const isNew = newCodes.some((nc) => nc.code === code.code);
+                const joinUrl = `${origin}/join/${code.code}`;
+                return (
+                  <div
+                    key={code.code}
+                    className="admin-code-row"
+                    style={isNew ? { outline: "1px solid var(--accent-teal)", borderRadius: 4 } : undefined}
+                  >
+                    <code className="admin-code-row__code">{code.code}</code>
+                    <span className={`badge ${code.status === "unused" ? "badge-library" : code.status === "used" ? "badge-nominated" : "badge-requested"}`}>
+                      {code.status}
                     </span>
-                  )}
-                </div>
-              ))}
+                    <span className="label-mono text-dim">
+                      {code.createdByVoterId ? "guest" : "root"}
+                    </span>
+                    <span style={{ flex: 1 }} />
+                    {code.status === "unused" && (
+                      <>
+                        <CopyButton text={joinUrl} />
+                        <button className="btn btn-danger btn-sm" onClick={() => revokeCode(code.code)}>
+                          Revoke
+                        </button>
+                      </>
+                    )}
+                    {code.status === "used" && (
+                      <span className="label-mono text-dim">
+                        used {code.usedAt ? new Date(code.usedAt).toLocaleDateString() : ""}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

@@ -15,22 +15,24 @@ const sqlite = new DatabaseSync(dbPath);
 export const db = drizzle(
   async (sql, params, method) => {
     const stmt = sqlite.prepare(sql);
+    // setReturnArrays(true) returns rows as value arrays instead of named objects.
+    // This is required because JOIN queries can select same-named columns from
+    // multiple tables (e.g. both invite_codes.status and sessions.status).
+    // A plain object would silently overwrite the duplicate key, causing wrong
+    // values at the wrong positional index when drizzle maps fields by position.
+    stmt.setReturnArrays(true);
     if (method === "run") {
       stmt.run(...(params as []));
       return { rows: [] };
     }
     if (method === "get") {
-      const row = stmt.get(...(params as [])) as Record<string, unknown> | undefined;
-      // Must return undefined (not []) when no row found.
-      // drizzle mapGetResult does `if (!row) return void 0` — an empty array []
-      // is truthy and would make drizzle return {id: undefined} instead of undefined.
-      return { rows: (row ? Object.values(row) : undefined) as unknown as [] };
+      const row = stmt.get(...(params as [])) as unknown[] | undefined;
+      // Return undefined (not []) when no row found so drizzle mapGetResult
+      // returns undefined rather than a partially-filled object.
+      return { rows: (row ?? undefined) as unknown as [] };
     }
-    // "all" and "values"
-    const rows = (stmt.all(...(params as [])) as Record<string, unknown>[]).map(
-      (r) => Object.values(r),
-    );
-    return { rows };
+    // "all" and "values" — already arrays of arrays with setReturnArrays
+    return { rows: stmt.all(...(params as [])) as unknown[][] };
   },
   { schema },
 );

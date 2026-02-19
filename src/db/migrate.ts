@@ -12,14 +12,12 @@ const sqlite = new DatabaseSync(dbPath);
 
 const db = drizzle(async (sql, params, method) => {
   const stmt = sqlite.prepare(sql);
+  stmt.setReturnArrays(true);
   if (method === "run") {
     stmt.run(...(params as []));
     return { rows: [] };
   }
-  const rows = (stmt.all(...(params as [])) as Record<string, unknown>[]).map((r) =>
-    Object.values(r),
-  );
-  return { rows };
+  return { rows: stmt.all(...(params as [])) as unknown[][] };
 });
 
 async function runMigrations() {
