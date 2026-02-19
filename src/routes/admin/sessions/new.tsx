@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { adminCreateSession } from "../../../server/admin";
-import { copyToClipboard } from "../../../utils/clipboard";
 
 export const Route = createFileRoute("/admin/sessions/new")({
   component: CreateSessionPage,
@@ -20,7 +19,6 @@ function CreateSessionPage() {
     name: "",
     slug: "",
     votesPerVoter: 5,
-    rootInviteCodes: 1,
     guestInviteSlots: 1,
     maxInviteDepth: "",
     allowJellyseerrRequests: true,
@@ -74,7 +72,7 @@ function CreateSessionPage() {
           name: form.name,
           slug: form.slug,
           votesPerVoter: Number(form.votesPerVoter),
-          rootInviteCodes: Number(form.rootInviteCodes),
+          rootInviteCodes: 0,
           guestInviteSlots: Number(form.guestInviteSlots),
           maxInviteDepth: form.maxInviteDepth ? Number(form.maxInviteDepth) : null,
           allowJellyseerrRequests: form.allowJellyseerrRequests,
@@ -99,32 +97,16 @@ function CreateSessionPage() {
             <p className="label-mono text-teal">
               {result.session.name} · /vote/{result.session.slug}
             </p>
-
-            <div className="mt-3">
-              <p className="form-label mb-1">Root Invite Links</p>
-              <div className="invite-list">
-                {result.rootInviteLinks.map((link: any) => (
-                  <div key={link.code} className="invite-list__item">
-                    <span className="invite-list__stamp label-mono">PASS</span>
-                    <span className="invite-list__url value-mono">{link.url}</span>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => copyToClipboard(link.url)}
-                    >
-                      Copy
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
+            <p className="label-mono" style={{ color: "var(--text-muted)", marginTop: "0.5rem" }}>
+              Go to the session to create invite codes with names.
+            </p>
             <div className="flex gap-2 mt-3" style={{ flexWrap: "wrap" }}>
               <Link
                 to="/admin/sessions/$id"
                 params={{ id: result.session.id }}
                 className="btn btn-primary"
               >
-                Manage Session
+                Manage Session →
               </Link>
               <Link to="/admin" className="btn btn-secondary">
                 All Sessions
@@ -185,19 +167,6 @@ function CreateSessionPage() {
                 className="form-input"
                 name="votesPerVoter"
                 value={form.votesPerVoter}
-                onChange={handleChange}
-                min={1}
-                max={20}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Root Invite Codes</label>
-              <input
-                type="number"
-                className="form-input"
-                name="rootInviteCodes"
-                value={form.rootInviteCodes}
                 onChange={handleChange}
                 min={1}
                 max={20}

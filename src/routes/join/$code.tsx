@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { claimInvite } from "../../server/invites";
 import { getBrowserFingerprint } from "../../utils/fingerprint";
-import { copyToClipboard } from "../../utils/clipboard";
 
 export const Route = createFileRoute("/join/$code")({
   component: JoinPage,
@@ -14,19 +13,16 @@ function JoinPage() {
   const router = useRouter();
   const [state, setState] = useState<"loading" | "success" | "error">("loading");
   const [errorData, setErrorData] = useState<{ code?: string; message: string; sessionName?: string; slug?: string } | null>(null);
-  const [sessionData, setSessionData] = useState<{ name: string; slug: string } | null>(null);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
-  const [showInvite, setShowInvite] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [sessionData, setSessionData] = useState<{ name: string; slug: string; inviteSlotsRemaining: number } | null>(null);
+  const [showEnter, setShowEnter] = useState(false);
 
   useEffect(() => {
     getBrowserFingerprint()
       .then((fingerprint) => claimInvite({ data: { code, fingerprint } }))
       .then((result) => {
-        setSessionData({ name: result.session.name, slug: result.session.slug });
-        setInviteUrl(result.voter.inviteUrl);
+        setSessionData({ name: result.session.name, slug: result.session.slug, inviteSlotsRemaining: result.voter.inviteSlotsRemaining });
         setState("success");
-        setTimeout(() => setShowInvite(true), 1200);
+        setTimeout(() => setShowEnter(true), 900);
       })
       .catch((err: Error) => {
         const msg = err.message || "";
@@ -44,14 +40,6 @@ function JoinPage() {
         setState("error");
       });
   }, [code]);
-
-  function copyInvite() {
-    if (!inviteUrl) return;
-    copyToClipboard(inviteUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
 
   function enterVotingRoom() {
     if (!sessionData) return;
@@ -125,44 +113,23 @@ function JoinPage() {
           <div className="join-ticket__tear" />
         </motion.div>
 
-        {showInvite && (
-          <motion.div
-            className="join-invite-reveal"
-            initial={{ opacity: 0, y: 16 }}
+        {showEnter && sessionData && sessionData.inviteSlotsRemaining > 0 && (
+          <motion.p
+            className="label-mono join-invite-note"
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.3 }}
           >
-            {inviteUrl ? (
-              <>
-                <p className="label-mono">Your personal invite link</p>
-                <div className="join-invite-code">
-                  <span className="join-invite-code__stamp">PASS</span>
-                  <span className="join-invite-code__url">{inviteUrl}</span>
-                </div>
-                <button
-                  className={`btn btn-secondary join-invite-copy${copied ? " copied" : ""}`}
-                  onClick={copyInvite}
-                >
-                  {copied ? "Copied to Clipboard" : "Copy Invite Link"}
-                </button>
-                <p className="join-invite-note label-mono">
-                  This link brings in one person. Keep it exclusive.
-                </p>
-              </>
-            ) : (
-              <p className="join-invite-note label-mono">
-                This session is at capacity — you can vote but cannot invite others.
-              </p>
-            )}
-          </motion.div>
+            You can invite others from the Invites tab once you're inside.
+          </motion.p>
         )}
 
         <motion.button
           className="btn btn-primary btn-lg join-enter-btn"
           onClick={enterVotingRoom}
           initial={{ opacity: 0 }}
-          animate={{ opacity: showInvite ? 1 : 0 }}
-          transition={{ delay: 0.2 }}
+          animate={{ opacity: showEnter ? 1 : 0 }}
+          transition={{ delay: 0.1 }}
         >
           Enter Voting Room
         </motion.button>

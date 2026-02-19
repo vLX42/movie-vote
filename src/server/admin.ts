@@ -45,7 +45,6 @@ type CreateSessionInput = {
   slug: string;
   votesPerVoter?: number;
   rootInviteCodes?: number;
-  rootInviteLabel?: string;
   guestInviteSlots?: number;
   maxInviteDepth?: number | null;
   allowJellyseerrRequests?: boolean;
@@ -57,10 +56,9 @@ export const adminCreateSession = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     requireAdmin(data.secret);
 
-    const { name, slug, votesPerVoter = 5, rootInviteCodes = 1,
-      rootInviteLabel, guestInviteSlots = 1, maxInviteDepth = null,
+    const { name, slug, votesPerVoter = 5,
+      guestInviteSlots = 1, maxInviteDepth = null,
       allowJellyseerrRequests = true, expiresAt = null } = data;
-    const resolvedRootLabel = rootInviteLabel?.trim() || "Admin";
 
     if (!name || !slug) throw new Error("name and slug are required");
     if (!/^[a-z0-9-]+$/.test(slug)) throw new Error("slug must be lowercase alphanumeric with hyphens only");
@@ -82,27 +80,9 @@ export const adminCreateSession = createServerFn({ method: "POST" })
       expiresAt: expiresAt ?? null,
     });
 
-    const codes: string[] = [];
-    for (let i = 0; i < rootInviteCodes; i++) {
-      const code = generateInviteCode();
-      await db.insert(inviteCodes).values({
-        code,
-        sessionId,
-        createdByVoterId: null,
-        status: "unused",
-        label: resolvedRootLabel,
-      });
-      codes.push(code);
-    }
-
     const session = await db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
-    const url = getRequestUrl();
-    const baseUrl = `${url.protocol}//${url.host}`;
 
-    return {
-      session,
-      rootInviteLinks: codes.map((c) => ({ code: c, url: `${baseUrl}/join/${c}` })),
-    };
+    return { session };
   });
 
 export const adminGetSession = createServerFn({ method: "POST" })

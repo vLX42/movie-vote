@@ -3,7 +3,7 @@ import { getCookie, setCookie, getRequestUrl } from "@tanstack/react-start/serve
 import { eq, and } from "drizzle-orm";
 import { db } from "../db";
 import { inviteCodes, voters, sessions } from "../db/schema";
-import { generateInviteCode } from "../lib/inviteCodes";
+
 
 type ClaimInviteInput = { code: string; fingerprint?: string };
 
@@ -99,7 +99,6 @@ export const claimInvite = createServerFn({ method: "POST" })
     }
 
     const voterId = crypto.randomUUID();
-    const voterInviteCode = invite.guestInviteSlots > 0 ? generateInviteCode() : null;
 
     // Create voter and mark invite as used
     await db.insert(voters).values({
@@ -108,7 +107,7 @@ export const claimInvite = createServerFn({ method: "POST" })
       displayName: null,
       invitedBy: invite.createdByVoterId || null,
       inviteDepth,
-      inviteCode: voterInviteCode,
+      inviteCode: null,
       inviteSlotsRemaining: invite.guestInviteSlots,
       fingerprint,
     });
@@ -118,15 +117,6 @@ export const claimInvite = createServerFn({ method: "POST" })
       .set({ status: "used", usedByVoterId: voterId, usedAt: new Date().toISOString() })
       .where(eq(inviteCodes.code, code));
 
-    if (voterInviteCode) {
-      await db.insert(inviteCodes).values({
-        code: voterInviteCode,
-        sessionId: invite.sessionId,
-        createdByVoterId: voterId,
-        status: "unused",
-      });
-    }
-
     // Set voter cookie
     setCookie("movienightapp_voter", voterId, {
       httpOnly: true,
@@ -135,10 +125,6 @@ export const claimInvite = createServerFn({ method: "POST" })
       maxAge: 365 * 24 * 60 * 60,
       path: "/",
     });
-
-    const url = getRequestUrl();
-    const baseUrl = `${url.protocol}//${url.host}`;
-    const inviteUrl = voterInviteCode ? `${baseUrl}/join/${voterInviteCode}` : null;
 
     return {
       success: true,
@@ -153,7 +139,6 @@ export const claimInvite = createServerFn({ method: "POST" })
         id: voterId,
         displayName: null,
         inviteSlotsRemaining: invite.guestInviteSlots,
-        inviteUrl,
       },
     };
   });
