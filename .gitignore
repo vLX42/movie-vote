@@ -8,6 +8,11 @@ node_modules/
 
 # Build output
 frontend/dist/
+.output/
+.nitro/
+
+# Generated
+src/routeTree.gen.ts
 
 # Database
 db/*.sqlite
