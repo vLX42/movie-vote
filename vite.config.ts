@@ -11,7 +11,14 @@ export default defineConfig({
   plugins: [
     tsConfigPaths(),
     tanstackStart(),
-    nitro(),
+    nitro({
+      externals: {
+        // @libsql/client loads its native binary (e.g. @libsql/linux-x64-gnu)
+        // via a dynamic require() that Rollup/commonjs cannot bundle.
+        // Mark it external so Node.js resolves it at runtime from node_modules.
+        external: ["@libsql/client", "libsql"],
+      },
+    }),
     viteReact(),
   ],
 });
