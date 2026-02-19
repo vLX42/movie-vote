@@ -127,7 +127,7 @@ export const claimInvite = createServerFn({ method: "POST" })
     setCookie("movienightapp_voter", voterId, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // app is served over plain HTTP on local network
       maxAge: 365 * 24 * 60 * 60,
       path: "/",
     });

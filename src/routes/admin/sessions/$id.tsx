@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
+import { copyToClipboard } from "../../../utils/clipboard";
 import {
   adminGetSession,
   adminGetTree,
@@ -22,7 +23,7 @@ function getAdminSecret() {
 function CopyButton({ text, label = "Copy Link" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   async function handleCopy() {
-    await navigator.clipboard.writeText(text);
+    await copyToClipboard(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

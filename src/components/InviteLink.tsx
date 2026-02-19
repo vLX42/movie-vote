@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { copyToClipboard } from "../utils/clipboard";
 
 type Props = {
   inviteUrl: string | null;
@@ -12,7 +13,7 @@ export default function InviteLink({ inviteUrl, slotsRemaining }: Props) {
 
   function copy() {
     if (!inviteUrl) return;
-    navigator.clipboard.writeText(inviteUrl).then(() => {
+    copyToClipboard(inviteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { adminCreateSession } from "../../../server/admin";
+import { copyToClipboard } from "../../../utils/clipboard";
 
 export const Route = createFileRoute("/admin/sessions/new")({
   component: CreateSessionPage,
@@ -108,7 +109,7 @@ function CreateSessionPage() {
                     <span className="invite-list__url value-mono">{link.url}</span>
                     <button
                       className="btn btn-secondary btn-sm"
-                      onClick={() => navigator.clipboard.writeText(link.url)}
+                      onClick={() => copyToClipboard(link.url)}
                     >
                       Copy
                     </button>
