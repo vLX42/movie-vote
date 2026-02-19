@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "../db";
 import { votes, movies, voters, sessions } from "../db/schema";
 
@@ -37,24 +37,25 @@ export const castVote = createServerFn({ method: "POST" })
 
     if (!movie) throw new Error("Movie not found");
 
-    const totalVotes = await db
-      .select({ cnt: count() })
+    // Use .all() + .length instead of count() — count() via sqlite-proxy returns wrong values
+    const userVotes = await db
+      .select({ id: votes.id })
       .from(votes)
-      .where(and(eq(votes.sessionId, session.id), eq(votes.voterId, voterId)))
-      .get();
+      .where(and(eq(votes.sessionId, session.id), eq(votes.voterId, voterId)));
 
-    if ((totalVotes?.cnt ?? 0) >= session.votesPerVoter) {
+    if (userVotes.length >= session.votesPerVoter) {
       throw new Error(`You have used all ${session.votesPerVoter} votes`);
     }
 
     // Enforce max 1 vote per movie per voter
     const existingMovieVote = await db
-      .select({ cnt: count() })
+      .select({ id: votes.id })
       .from(votes)
       .where(and(eq(votes.movieId, data.movieId), eq(votes.voterId, voterId)))
+      .limit(1)
       .get();
 
-    if ((existingMovieVote?.cnt ?? 0) >= 1) {
+    if (existingMovieVote) {
       throw new Error("You have already voted for this movie");
     }
 
@@ -65,18 +66,18 @@ export const castVote = createServerFn({ method: "POST" })
       movieId: data.movieId,
     });
 
-    const newTotal = (totalVotes?.cnt ?? 0) + 1;
-    const movieVotes = await db
-      .select({ cnt: count() })
-      .from(votes)
-      .where(and(eq(votes.movieId, data.movieId), eq(votes.sessionId, session.id)))
-      .get();
+    const newTotal = userVotes.length + 1;
 
-    const myMovieVotes = await db
-      .select({ cnt: count() })
+    // Fetch post-insert counts via .all() + .length
+    const movieVoteRows = await db
+      .select({ id: votes.id })
       .from(votes)
-      .where(and(eq(votes.movieId, data.movieId), eq(votes.voterId, voterId)))
-      .get();
+      .where(and(eq(votes.movieId, data.movieId), eq(votes.sessionId, session.id)));
+
+    const myMovieVoteRows = await db
+      .select({ id: votes.id })
+      .from(votes)
+      .where(and(eq(votes.movieId, data.movieId), eq(votes.voterId, voterId)));
 
     return {
       success: true,
@@ -84,8 +85,8 @@ export const castVote = createServerFn({ method: "POST" })
       votesRemaining: session.votesPerVoter - newTotal,
       movie: {
         id: data.movieId,
-        voteCount: movieVotes?.cnt ?? 0,
-        myVotes: myMovieVotes?.cnt ?? 0,
+        voteCount: movieVoteRows.length,
+        myVotes: myMovieVoteRows.length,
       },
     };
   });
@@ -105,7 +106,7 @@ export const retractVote = createServerFn({ method: "POST" })
     if (!session) throw new Error("NOT_FOUND");
     if (session.status !== "open") throw new Error("Session is closed");
 
-    // Find most recent vote for this movie by this voter
+    // Find vote for this movie by this voter
     const vote = await db
       .select()
       .from(votes)
@@ -123,34 +124,30 @@ export const retractVote = createServerFn({ method: "POST" })
 
     await db.delete(votes).where(eq(votes.id, vote.id));
 
-    const totalVotes = await db
-      .select({ cnt: count() })
+    // Fetch post-delete counts via .all() + .length
+    const userVotes = await db
+      .select({ id: votes.id })
       .from(votes)
-      .where(and(eq(votes.sessionId, session.id), eq(votes.voterId, voterId)))
-      .get();
+      .where(and(eq(votes.sessionId, session.id), eq(votes.voterId, voterId)));
 
-    const movieVotes = await db
-      .select({ cnt: count() })
+    const movieVoteRows = await db
+      .select({ id: votes.id })
       .from(votes)
-      .where(and(eq(votes.movieId, data.movieId), eq(votes.sessionId, session.id)))
-      .get();
+      .where(and(eq(votes.movieId, data.movieId), eq(votes.sessionId, session.id)));
 
-    const myMovieVotes = await db
-      .select({ cnt: count() })
+    const myMovieVoteRows = await db
+      .select({ id: votes.id })
       .from(votes)
-      .where(and(eq(votes.movieId, data.movieId), eq(votes.voterId, voterId)))
-      .get();
-
-    const cnt = totalVotes?.cnt ?? 0;
+      .where(and(eq(votes.movieId, data.movieId), eq(votes.voterId, voterId)));
 
     return {
       success: true,
-      votesUsed: cnt,
-      votesRemaining: session.votesPerVoter - cnt,
+      votesUsed: userVotes.length,
+      votesRemaining: session.votesPerVoter - userVotes.length,
       movie: {
         id: data.movieId,
-        voteCount: movieVotes?.cnt ?? 0,
-        myVotes: myMovieVotes?.cnt ?? 0,
+        voteCount: movieVoteRows.length,
+        myVotes: myMovieVoteRows.length,
       },
     };
   });

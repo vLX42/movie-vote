@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq, count, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { sessions, movies, voters, votes, inviteCodes } from "../db/schema";
 import { generateInviteCode } from "../lib/inviteCodes";
@@ -168,15 +168,16 @@ export const adminCloseSession = createServerFn({ method: "POST" })
 
     let winner = data.winnerMovieId;
     if (!winner) {
-      const topMovie = await db
-        .select({ movieId: votes.movieId, cnt: count() })
+      // Use JS-based counting to avoid count() issues with sqlite-proxy
+      const allVotes = await db
+        .select({ movieId: votes.movieId })
         .from(votes)
-        .where(eq(votes.sessionId, session.id))
-        .groupBy(votes.movieId)
-        .orderBy(sql`COUNT(*) DESC`)
-        .limit(1)
-        .get();
-      winner = topMovie?.movieId ?? undefined;
+        .where(eq(votes.sessionId, session.id));
+      const voteCounts: Record<string, number> = {};
+      for (const v of allVotes) {
+        voteCounts[v.movieId] = (voteCounts[v.movieId] ?? 0) + 1;
+      }
+      winner = Object.entries(voteCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
     }
 
     await db

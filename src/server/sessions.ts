@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
-import { eq, and, count, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "../db";
 import { sessions, movies, voters, votes } from "../db/schema";
 
@@ -73,7 +73,8 @@ export const getSession = createServerFn({ method: "GET" })
       throw new Error("UNAUTHORIZED");
     }
 
-    // Get movies with vote counts
+    // Fetch movies and all votes for the session separately,
+    // then join in JS — avoids count()/subquery mapping issues with sqlite-proxy
     const movieRows = await db
       .select({
         id: movies.id,
@@ -90,20 +91,36 @@ export const getSession = createServerFn({ method: "GET" })
         status: movies.status,
         nominatedBy: movies.nominatedBy,
         createdAt: movies.createdAt,
-        voteCount: sql<number>`(SELECT COUNT(*) FROM votes WHERE movie_id = ${movies.id})`,
-        myVotes: sql<number>`(SELECT COUNT(*) FROM votes WHERE movie_id = ${movies.id} AND voter_id = ${voterId})`,
       })
       .from(movies)
-      .where(eq(movies.sessionId, session.id))
-      .orderBy(sql`(SELECT COUNT(*) FROM votes WHERE movie_id = ${movies.id}) DESC`, movies.createdAt);
+      .where(eq(movies.sessionId, session.id));
 
-    const totalVotesUsed = await db
-      .select({ cnt: count() })
+    // Fetch all votes for this session in one query
+    const allVotes = await db
+      .select({ movieId: votes.movieId, voterId: votes.voterId })
       .from(votes)
-      .where(and(eq(votes.sessionId, session.id), eq(votes.voterId, voterId)))
-      .get();
+      .where(eq(votes.sessionId, session.id));
 
-    const votesUsed = totalVotesUsed?.cnt ?? 0;
+    // Count votes per movie and voter in JS
+    const movieVoteCounts: Record<string, number> = {};
+    const myMovieVoteCounts: Record<string, number> = {};
+    let votesUsed = 0;
+
+    for (const v of allVotes) {
+      movieVoteCounts[v.movieId] = (movieVoteCounts[v.movieId] ?? 0) + 1;
+      if (v.voterId === voterId) {
+        myMovieVoteCounts[v.movieId] = (myMovieVoteCounts[v.movieId] ?? 0) + 1;
+        votesUsed++;
+      }
+    }
+
+    const moviesWithVotes: Movie[] = movieRows
+      .map((m) => ({
+        ...m,
+        voteCount: movieVoteCounts[m.id] ?? 0,
+        myVotes: myMovieVoteCounts[m.id] ?? 0,
+      }))
+      .sort((a, b) => b.voteCount - a.voteCount || a.createdAt.localeCompare(b.createdAt));
 
     const url = getRequestUrl();
     const baseUrl = `${url.protocol}//${url.host}`;
@@ -128,7 +145,7 @@ export const getSession = createServerFn({ method: "GET" })
         inviteSlotsRemaining: voter.inviteSlotsRemaining,
         inviteUrl,
       },
-      movies: movieRows as Movie[],
+      movies: moviesWithVotes,
     };
   });
 
