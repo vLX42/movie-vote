@@ -131,3 +131,7 @@ export function filterMockMovies(query: string) {
     (m) => m.title.toLowerCase().includes(q) || String(m.year).includes(q)
   );
 }
+
+export function getMockRecentMovies() {
+  return MOCK_MOVIES_RAW.filter((m) => m.source === "jellyfin");
+}

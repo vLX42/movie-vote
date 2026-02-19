@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
-import { isMockMode, filterMockMovies } from "./mock-media";
+import { isMockMode, filterMockMovies, getMockRecentMovies } from "./mock-media";
 
 function requireVoter() {
   const voterId = getCookie("movienightapp_voter");
@@ -110,4 +110,48 @@ export const searchTmdb = createServerFn({ method: "POST" })
       });
 
     return { results };
+  });
+
+export const recentlyAddedJellyfin = createServerFn({ method: "POST" })
+  .handler(async () => {
+    requireVoter();
+
+    if (isMockMode()) {
+      return { results: getMockRecentMovies() };
+    }
+
+    const jellyfinUrl = process.env.JELLYFIN_URL;
+    const jellyfinKey = process.env.JELLYFIN_API_KEY;
+
+    if (!jellyfinUrl || !jellyfinKey) {
+      throw new Error("Jellyfin is not configured");
+    }
+
+    const url = new URL(`${jellyfinUrl}/Items`);
+    url.searchParams.set("SortBy", "DateCreated");
+    url.searchParams.set("SortOrder", "Descending");
+    url.searchParams.set("IncludeItemTypes", "Movie");
+    url.searchParams.set("Recursive", "true");
+    url.searchParams.set("Fields", "Overview,RunTimeTicks,ProductionYear,PrimaryImageAspectRatio,ProviderIds");
+    url.searchParams.set("Limit", "20");
+    url.searchParams.set("api_key", jellyfinKey);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) throw new Error(`Jellyfin returned ${response.status}`);
+
+    const data = await response.json() as { Items?: any[] };
+    const items = (data.Items ?? []).map((item: any) => ({
+      id: `jellyfin:${item.Id}`,
+      title: item.Name,
+      year: item.ProductionYear ?? null,
+      runtimeMinutes: item.RunTimeTicks ? Math.round(item.RunTimeTicks / 600000000) : null,
+      synopsis: item.Overview ?? null,
+      posterUrl: `/api/images/jellyfin/${item.Id}`,
+      source: "jellyfin",
+      jellyfinId: item.Id,
+      tmdbId: item.ProviderIds?.Tmdb ?? null,
+      status: "in_library",
+    }));
+
+    return { results: items };
   });

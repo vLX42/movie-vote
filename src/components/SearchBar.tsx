@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { searchJellyfin, searchTmdb } from "../server/search";
+import { searchJellyfin, searchTmdb, recentlyAddedJellyfin } from "../server/search";
 import { nominateMovie, requestMovie } from "../server/movies";
 
 type SearchResult = {
@@ -53,6 +53,28 @@ export default function SearchBar({ sessionSlug, allowRequests, onMovieAdded }: 
     }
   }, []);
 
+  const loadRecent = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setResults([]);
+    try {
+      const data = await recentlyAddedJellyfin();
+      setResults(data.results as SearchResult[]);
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to load recent movies");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Auto-load when switching to Recent tab
+  useEffect(() => {
+    if (source === "recent") {
+      setOpen(true);
+      loadRecent();
+    }
+  }, [source, loadRecent]);
+
   function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
     const q = e.target.value;
     setQuery(q);
@@ -62,7 +84,7 @@ export default function SearchBar({ sessionSlug, allowRequests, onMovieAdded }: 
 
   function handleSourceChange(src: string) {
     setSource(src);
-    if (query.length >= 2) search(query, src);
+    if (src !== "recent" && query.length >= 2) search(query, src);
   }
 
   async function nominate(movie: SearchResult) {
@@ -147,35 +169,43 @@ export default function SearchBar({ sessionSlug, allowRequests, onMovieAdded }: 
               Request
             </button>
           )}
+          <button
+            className={`search-bar__tab${source === "recent" ? " active" : ""}`}
+            onClick={() => handleSourceChange("recent")}
+          >
+            Recent
+          </button>
         </div>
-        <div className="search-bar__input-wrap">
-          <span className="search-bar__icon">▷</span>
-          <input
-            ref={inputRef}
-            className="search-bar__input"
-            type="text"
-            placeholder={source === "jellyfin" ? "Search your library..." : "Search all movies..."}
-            value={query}
-            onChange={handleInput}
-            onFocus={() => setOpen(true)}
-          />
-          {query && (
-            <button
-              className="search-bar__clear"
-              onClick={() => {
-                setQuery("");
-                setResults([]);
-                inputRef.current?.focus();
-              }}
-            >
-              ×
-            </button>
-          )}
-        </div>
+        {source !== "recent" && (
+          <div className="search-bar__input-wrap">
+            <span className="search-bar__icon">▷</span>
+            <input
+              ref={inputRef}
+              className="search-bar__input"
+              type="text"
+              placeholder={source === "jellyfin" ? "Search your library..." : "Search all movies..."}
+              value={query}
+              onChange={handleInput}
+              onFocus={() => setOpen(true)}
+            />
+            {query && (
+              <button
+                className="search-bar__clear"
+                onClick={() => {
+                  setQuery("");
+                  setResults([]);
+                  inputRef.current?.focus();
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <AnimatePresence>
-        {open && query.length >= 2 && (
+        {open && (source === "recent" || query.length >= 2) && (
           <motion.div
             className="search-results"
             initial={{ opacity: 0, y: -8 }}
@@ -185,7 +215,7 @@ export default function SearchBar({ sessionSlug, allowRequests, onMovieAdded }: 
           >
             {loading && (
               <div className="search-results__loading">
-                <span className="label-mono">Searching...</span>
+                <span className="label-mono">{source === "recent" ? "Loading recent..." : "Searching..."}</span>
               </div>
             )}
             {error && (
@@ -195,7 +225,9 @@ export default function SearchBar({ sessionSlug, allowRequests, onMovieAdded }: 
             )}
             {!loading && results.length === 0 && !error && (
               <div className="search-results__empty">
-                <span className="label-mono">No results for "{query}"</span>
+                <span className="label-mono">
+                  {source === "recent" ? "No recently added movies found." : `No results for "${query}"`}
+                </span>
               </div>
             )}
             {results.map((movie) => (
@@ -210,7 +242,7 @@ export default function SearchBar({ sessionSlug, allowRequests, onMovieAdded }: 
                 isRequesting={requestingId === movie.id}
               />
             ))}
-            <button className="search-results__close" onClick={() => setOpen(false)}>
+            <button className="search-results__close" onClick={() => { setOpen(false); if (source === "recent") setSource("jellyfin"); }}>
               <span className="label-mono">Close</span>
             </button>
           </motion.div>
