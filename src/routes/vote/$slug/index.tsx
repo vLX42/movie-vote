@@ -139,6 +139,9 @@ function VotingRoomPage() {
             allowRequests={session.allowJellyseerrRequests}
             onMovieAdded={handleMovieAdded}
           />
+          <p className="voting-room__search-hint label-mono">
+            Search for movies you want the group to watch and nominate them — then vote on the ones you like most.
+          </p>
         </div>
       )}
 
@@ -362,10 +365,12 @@ function EmptyState({ isOpen }: { isOpen: boolean }) {
   return (
     <div className="empty-state">
       <div className="empty-state__icon">▶▶</div>
-      <h2 className="empty-state__title title-large">No Films Yet</h2>
+      <h2 className="empty-state__title title-large">
+        {isOpen ? "What do you want to watch?" : "No Films Nominated"}
+      </h2>
       <p className="empty-state__sub label-mono">
         {isOpen
-          ? "Search above to nominate the first movie."
+          ? "Use the search above to find a movie and nominate it. Everyone can nominate, and everyone votes."
           : "Nothing was nominated before voting closed."}
       </p>
     </div>

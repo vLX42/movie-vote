@@ -150,6 +150,7 @@ img { display: block; max-width: 100%; }
 .winner-banner__year { color: var(--text-muted); }
 
 .voting-room__search { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+.voting-room__search-hint { margin-top: 0.5rem; color: var(--text-muted); font-size: 0.78rem; }
 
 .voting-room__controls { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); }
 .view-toggle { display: flex; gap: 0; }

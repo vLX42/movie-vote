@@ -10,6 +10,7 @@ import {
   adminRevokeCode,
   adminReopenCode,
   adminDeleteCode,
+  adminClearVotes,
   adminRemoveVoter,
   adminAdjustInviteSlots,
 } from "../../../server/admin";
@@ -166,6 +167,19 @@ function SessionManagerPage() {
     }
   }
 
+  async function clearVotes(voterId?: string, name?: string) {
+    const msg = voterId
+      ? `Clear all votes cast by ${name}? This cannot be undone.`
+      : `Clear ALL votes in this session? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    try {
+      await adminClearVotes({ data: { secret, sessionId: id, voterId } });
+      loadData();
+    } catch (err: any) {
+      alert(err?.message);
+    }
+  }
+
   async function removeVoter(voterId: string, name: string) {
     if (!confirm(`Remove voter ${name}? Their votes will remain.`)) return;
     try {
@@ -241,6 +255,9 @@ function SessionManagerPage() {
             >
               Open Room ↗
             </Link>
+            <button className="btn btn-danger btn-sm" onClick={() => clearVotes()}>
+              Clear All Votes
+            </button>
             <button className="btn btn-danger btn-sm" onClick={deleteSession}>
               Delete Session
             </button>
@@ -373,6 +390,14 @@ function SessionManagerPage() {
                     )}
                   </div>
                   <div className="admin-voter-row__actions">
+                    {voter.voteCount > 0 && (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => clearVotes(voter.id, voter.displayName || voter.id.slice(0, 8))}
+                      >
+                        Clear Votes
+                      </button>
+                    )}
                     <button
                       className="btn btn-danger btn-sm"
                       onClick={() => removeVoter(voter.id, voter.displayName || voter.id.slice(0, 8))}
@@ -415,6 +440,9 @@ function SessionManagerPage() {
               {codes.map((code: any) => {
                 const isNew = newCodes.some((nc) => nc.code === code.code);
                 const joinUrl = `${origin}/join/${code.code}`;
+                const usedByVoter = code.usedByVoterId
+                  ? voters.find((v: any) => v.id === code.usedByVoterId)
+                  : null;
                 return (
                   <div
                     key={code.code}
@@ -428,9 +456,16 @@ function SessionManagerPage() {
                     <span className={`badge ${code.status === "unused" ? "badge-library" : code.status === "used" ? "badge-nominated" : "badge-requested"}`}>
                       {code.status}
                     </span>
-                    <span className="label-mono text-dim">
-                      {code.createdByVoterId ? "guest" : "root"}
-                    </span>
+                    {usedByVoter && (
+                      <span className="label-mono text-dim" title={`Used by: ${usedByVoter.displayName || "Anonymous"}`}>
+                        {usedByVoter.displayName || "Anonymous"} · {usedByVoter.voteCount} vote{usedByVoter.voteCount !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {!usedByVoter && (
+                      <span className="label-mono text-dim">
+                        {code.createdByVoterId ? "guest" : "root"}
+                      </span>
+                    )}
                     <span style={{ flex: 1 }} />
                     {code.status === "unused" && (
                       <>

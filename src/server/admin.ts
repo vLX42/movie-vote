@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { db } from "../db";
 import { sessions, movies, voters, votes, inviteCodes } from "../db/schema";
 import { generateInviteCode } from "../lib/inviteCodes";
@@ -336,6 +336,22 @@ export const adminDeleteCode = createServerFn({ method: "POST" })
     }
 
     await db.delete(inviteCodes).where(eq(inviteCodes.code, data.code));
+
+    return { success: true };
+  });
+
+export const adminClearVotes = createServerFn({ method: "POST" })
+  .inputValidator((input: { secret: string; sessionId: string; voterId?: string }) => input)
+  .handler(async ({ data }) => {
+    requireAdmin(data.secret);
+
+    if (data.voterId) {
+      await db.delete(votes).where(
+        and(eq(votes.sessionId, data.sessionId), eq(votes.voterId, data.voterId))
+      );
+    } else {
+      await db.delete(votes).where(eq(votes.sessionId, data.sessionId));
+    }
 
     return { success: true };
   });

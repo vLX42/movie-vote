@@ -183,7 +183,7 @@ export default function SearchBar({ sessionSlug, allowRequests, onMovieAdded }: 
               ref={inputRef}
               className="search-bar__input"
               type="text"
-              placeholder={source === "jellyfin" ? "Search your library..." : "Search all movies..."}
+              placeholder={source === "jellyfin" ? "Search your library and nominate..." : "Search to request & nominate..."}
               value={query}
               onChange={handleInput}
               onFocus={() => setOpen(true)}
