@@ -24,6 +24,8 @@ export const claimInvite = createServerFn({ method: "POST" })
         guestInviteSlots: sessions.guestInviteSlots,
         maxInviteDepth: sessions.maxInviteDepth,
         allowJellyseerrRequests: sessions.allowJellyseerrRequests,
+        maxUses: inviteCodes.maxUses,
+        useCount: inviteCodes.useCount,
       })
       .from(inviteCodes)
       .innerJoin(sessions, eq(inviteCodes.sessionId, sessions.id))
@@ -67,12 +69,13 @@ export const claimInvite = createServerFn({ method: "POST" })
       }
     }
 
-    if (invite.status === "used") {
-      throw new Error("ALREADY_USED:This spot was already claimed.");
-    }
-
     if (invite.status === "revoked") {
       throw new Error("REVOKED:This invite link has been revoked.");
+    }
+
+    // Check if this invite has reached its device limit
+    if (invite.status === "used" || invite.useCount >= invite.maxUses) {
+      throw new Error(`FULLY_CLAIMED:${invite.maxUses}`);
     }
 
     // Determine invite depth
@@ -93,8 +96,10 @@ export const claimInvite = createServerFn({ method: "POST" })
     }
 
     const voterId = crypto.randomUUID();
+    const newUseCount = invite.useCount + 1;
+    const nowFull = newUseCount >= invite.maxUses;
 
-    // Create voter and mark invite as used
+    // Create voter
     await db.insert(voters).values({
       id: voterId,
       sessionId: invite.sessionId,
@@ -106,9 +111,15 @@ export const claimInvite = createServerFn({ method: "POST" })
       fingerprint,
     });
 
+    // Update use count; mark as "used" when the limit is reached
     await db
       .update(inviteCodes)
-      .set({ status: "used", usedByVoterId: voterId, usedAt: new Date().toISOString() })
+      .set({
+        useCount: newUseCount,
+        usedByVoterId: voterId,
+        usedAt: new Date().toISOString(),
+        ...(nowFull ? { status: "used" } : {}),
+      })
       .where(eq(inviteCodes.code, code));
 
     // Set voter cookie

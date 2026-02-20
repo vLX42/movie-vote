@@ -36,6 +36,9 @@ function JoinPage() {
           parsed.slug = slug;
           parsed.message = details;
         }
+        if (errorCode === "FULLY_CLAIMED") {
+          parsed.message = details; // contains the maxUses number
+        }
         setErrorData(parsed);
         setState("error");
       });
@@ -71,17 +74,19 @@ function JoinPage() {
           <div className="join-error__icon">⏏</div>
           <h1 className="title-large">
             {errorData.code === "ALREADY_USED" && "Spot Claimed"}
+            {errorData.code === "FULLY_CLAIMED" && "Link Full"}
             {errorData.code === "REVOKED" && "Link Revoked"}
             {errorData.code === "SESSION_CLOSED" && "Voting Closed"}
             {errorData.code === "INVALID" && "Invalid Link"}
-            {!["ALREADY_USED", "REVOKED", "SESSION_CLOSED", "INVALID"].includes(errorData.code ?? "") && "Access Denied"}
+            {!["ALREADY_USED", "FULLY_CLAIMED", "REVOKED", "SESSION_CLOSED", "INVALID"].includes(errorData.code ?? "") && "Access Denied"}
           </h1>
           <p className="join-error__message">
             {errorData.code === "ALREADY_USED" && "This spot was already claimed by someone else. Ask someone on the inside for a fresh invite."}
+            {errorData.code === "FULLY_CLAIMED" && `This link has already been used on ${errorData.message} device${errorData.message === "1" ? "" : "s"}. Ask the person who shared it to send you a new one.`}
             {errorData.code === "REVOKED" && "This invite link has been revoked by the host. Ask for a new one."}
             {errorData.code === "SESSION_CLOSED" && `Voting has wrapped up for ${errorData.sessionName}.`}
             {errorData.code === "INVALID" && "This link doesn't match any active session."}
-            {!["ALREADY_USED", "REVOKED", "SESSION_CLOSED", "INVALID"].includes(errorData.code ?? "") && (errorData.message || "Something went wrong.")}
+            {!["ALREADY_USED", "FULLY_CLAIMED", "REVOKED", "SESSION_CLOSED", "INVALID"].includes(errorData.code ?? "") && (errorData.message || "Something went wrong.")}
           </p>
         </motion.div>
       </div>

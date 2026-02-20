@@ -10,6 +10,7 @@ import InviteLink from "../../../components/InviteLink";
 import LiveResults from "../../../components/LiveResults";
 import type { Movie, SessionData, Invitee, SessionInvite } from "../../../server/sessions";
 import { copyToClipboard } from "../../../utils/clipboard";
+import OnboardingGuide from "../../../components/OnboardingGuide";
 
 export const Route = createFileRoute("/vote/$slug/")({
   loader: async ({ params }) => {
@@ -174,6 +175,8 @@ function VotingRoomPage() {
             : `${movies.length} film${movies.length !== 1 ? "s" : ""}`}
         </span>
       </div>
+
+      {isOpen && <OnboardingGuide votesPerVoter={session.votesPerVoter} />}
 
       <div className="voting-room__content">
         {view === "grid" && (

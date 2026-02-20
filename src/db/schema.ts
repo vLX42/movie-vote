@@ -53,6 +53,8 @@ export const inviteCodes = sqliteTable("invite_codes", {
   label: text("label"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   usedAt: text("used_at"),
+  maxUses: integer("max_uses").notNull().default(5),
+  useCount: integer("use_count").notNull().default(0),
 });
 
 export const votes = sqliteTable("votes", {
