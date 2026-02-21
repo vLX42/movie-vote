@@ -29,14 +29,29 @@ export const adminListSessions = createServerFn({ method: "POST" })
         expiresAt: sessions.expiresAt,
         createdAt: sessions.createdAt,
         winnerMovieId: sessions.winnerMovieId,
-        voterCount: sql<number>`(SELECT COUNT(*) FROM voters WHERE session_id = ${sessions.id})`,
-        movieCount: sql<number>`(SELECT COUNT(*) FROM movies WHERE session_id = ${sessions.id})`,
-        totalVotes: sql<number>`(SELECT COUNT(*) FROM votes WHERE session_id = ${sessions.id})`,
       })
       .from(sessions)
       .orderBy(sql`${sessions.createdAt} DESC`);
 
-    return { sessions: rows };
+    const allVoters = await db.select({ sessionId: voters.sessionId }).from(voters);
+    const allMovies = await db.select({ sessionId: movies.sessionId }).from(movies);
+    const allVotes  = await db.select({ sessionId: votes.sessionId  }).from(votes);
+
+    const voterCounts: Record<string, number> = {};
+    const movieCounts: Record<string, number> = {};
+    const voteCounts:  Record<string, number> = {};
+    for (const v of allVoters) voterCounts[v.sessionId] = (voterCounts[v.sessionId] ?? 0) + 1;
+    for (const m of allMovies) movieCounts[m.sessionId] = (movieCounts[m.sessionId] ?? 0) + 1;
+    for (const v of allVotes)  voteCounts[v.sessionId]  = (voteCounts[v.sessionId]  ?? 0) + 1;
+
+    return {
+      sessions: rows.map((s) => ({
+        ...s,
+        voterCount: voterCounts[s.id] ?? 0,
+        movieCount: movieCounts[s.id] ?? 0,
+        totalVotes: voteCounts[s.id]  ?? 0,
+      })),
+    };
   });
 
 type CreateSessionInput = {
@@ -109,11 +124,9 @@ export const adminGetSession = createServerFn({ method: "POST" })
         status: movies.status,
         nominatedBy: movies.nominatedBy,
         createdAt: movies.createdAt,
-        voteCount: sql<number>`(SELECT COUNT(*) FROM votes WHERE movie_id = ${movies.id})`,
       })
       .from(movies)
-      .where(eq(movies.sessionId, session.id))
-      .orderBy(sql`(SELECT COUNT(*) FROM votes WHERE movie_id = ${movies.id}) DESC`);
+      .where(eq(movies.sessionId, session.id));
 
     const voterRows = await db
       .select({
@@ -126,7 +139,6 @@ export const adminGetSession = createServerFn({ method: "POST" })
         inviteSlotsRemaining: voters.inviteSlotsRemaining,
         joinedAt: voters.joinedAt,
         fingerprint: voters.fingerprint,
-        voteCount: sql<number>`(SELECT COUNT(*) FROM votes WHERE voter_id = ${voters.id})`,
       })
       .from(voters)
       .where(eq(voters.sessionId, session.id))
@@ -138,7 +150,28 @@ export const adminGetSession = createServerFn({ method: "POST" })
       .where(eq(inviteCodes.sessionId, session.id))
       .orderBy(inviteCodes.createdAt);
 
-    return { session, movies: movieRows, voters: voterRows, codes: codeRows };
+    const sessionVotes = await db
+      .select({ movieId: votes.movieId, voterId: votes.voterId })
+      .from(votes)
+      .where(eq(votes.sessionId, session.id));
+
+    const movieVoteCounts: Record<string, number> = {};
+    const voterVoteCounts: Record<string, number> = {};
+    for (const v of sessionVotes) {
+      movieVoteCounts[v.movieId] = (movieVoteCounts[v.movieId] ?? 0) + 1;
+      voterVoteCounts[v.voterId] = (voterVoteCounts[v.voterId] ?? 0) + 1;
+    }
+
+    const moviesWithVotes = movieRows
+      .map((m) => ({ ...m, voteCount: movieVoteCounts[m.id] ?? 0 }))
+      .sort((a, b) => b.voteCount - a.voteCount);
+
+    const votersWithVotes = voterRows.map((v) => ({
+      ...v,
+      voteCount: voterVoteCounts[v.id] ?? 0,
+    }));
+
+    return { session, movies: moviesWithVotes, voters: votersWithVotes, codes: codeRows };
   });
 
 export const adminCloseSession = createServerFn({ method: "POST" })
@@ -189,7 +222,6 @@ export const adminGetTree = createServerFn({ method: "POST" })
         inviteSlotsRemaining: voters.inviteSlotsRemaining,
         joinedAt: voters.joinedAt,
         fingerprint: voters.fingerprint,
-        voteCount: sql<number>`(SELECT COUNT(*) FROM votes WHERE voter_id = ${voters.id})`,
       })
       .from(voters)
       .where(eq(voters.sessionId, session.id));
@@ -198,6 +230,16 @@ export const adminGetTree = createServerFn({ method: "POST" })
       .select()
       .from(inviteCodes)
       .where(eq(inviteCodes.sessionId, session.id));
+
+    const sessionVoteRows = await db
+      .select({ voterId: votes.voterId })
+      .from(votes)
+      .where(eq(votes.sessionId, session.id));
+
+    const voterVoteCounts: Record<string, number> = {};
+    for (const v of sessionVoteRows) {
+      voterVoteCounts[v.voterId] = (voterVoteCounts[v.voterId] ?? 0) + 1;
+    }
 
     type TreeNode = {
       id: string;
@@ -222,7 +264,7 @@ export const adminGetTree = createServerFn({ method: "POST" })
             id: voter.id,
             displayName: voter.displayName || `Guest #${voter.id.slice(0, 6)}`,
             inviteDepth: voter.inviteDepth,
-            voteCount: voter.voteCount,
+            voteCount: voterVoteCounts[voter.id] ?? 0,
             inviteSlotsRemaining: voter.inviteSlotsRemaining,
             joinedAt: voter.joinedAt,
             fingerprint: voter.fingerprint ?? null,
