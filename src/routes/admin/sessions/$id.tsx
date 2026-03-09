@@ -7,6 +7,7 @@ import {
   adminCloseSession,
   adminDeleteSession,
   adminGenerateCodes,
+  adminImportCodes,
   adminRevokeCode,
   adminReopenCode,
   adminDeleteCode,
@@ -47,8 +48,12 @@ function SessionManagerPage() {
   const [treeData, setTreeData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
-  const [newCodes, setNewCodes] = useState<{ code: string; url: string }[]>([]);
+  const [newCodes, setNewCodes] = useState<{ code: string; url: string; label?: string }[]>([]);
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
   const [editingSlots, setEditingSlots] = useState<{ voterId: string; value: string } | null>(null);
   const [editingDeadline, setEditingDeadline] = useState(false);
   const [deadlineValue, setDeadlineValue] = useState("");
@@ -132,6 +137,47 @@ function SessionManagerPage() {
       loadData();
     } catch (err: any) {
       setCodeError(err?.message ?? "Failed to generate code");
+    }
+  }
+
+  async function handleImport() {
+    const lines = importText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) {
+      setImportError("Please enter at least one entry.");
+      return;
+    }
+    const entries: { label: string; code?: string }[] = [];
+    const invalidLines: number[] = [];
+    lines.forEach((line, i) => {
+      const parts = line.split(",");
+      const label = parts[0].trim();
+      const code = parts.length > 1 ? parts[1].trim() : "";
+      if (!label) {
+        invalidLines.push(i + 1);
+      } else {
+        entries.push({ label, code: code || undefined });
+      }
+    });
+    if (invalidLines.length > 0) {
+      setImportError(`Line${invalidLines.length > 1 ? "s" : ""} ${invalidLines.join(", ")} ${invalidLines.length > 1 ? "have" : "has"} an empty name. Please fix and try again.`);
+      return;
+    }
+    setImportError(null);
+    setImportLoading(true);
+    try {
+      const res = await adminImportCodes({ data: { secret, sessionId: id, entries } });
+      setNewCodes(res.codes);
+      setShowImport(false);
+      setImportText("");
+      setActiveTab("codes");
+      loadData();
+    } catch (err: any) {
+      setImportError(err?.message ?? "Import failed");
+    } finally {
+      setImportLoading(false);
     }
   }
 
@@ -489,10 +535,45 @@ function SessionManagerPage() {
           <div className="panel">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
               <h3 className="panel-title" style={{ margin: 0 }}>Invite Codes ({codes.length})</h3>
-              <button className="btn btn-secondary btn-sm" onClick={() => generateMoreCodes(1)}>
-                + Generate Code
-              </button>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setShowImport((v) => !v); setImportError(null); }}>
+                  {showImport ? "✕ Cancel Import" : "↑ Import Codes"}
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={() => generateMoreCodes(1)}>
+                  + Generate Code
+                </button>
+              </div>
             </div>
+
+            {showImport && (
+              <div style={{ marginBottom: "1.25rem", padding: "1rem", background: "color-mix(in srgb, var(--bg-surface) 80%, transparent)", border: "1px solid var(--border)", borderRadius: 6 }}>
+                <p className="label-mono" style={{ marginBottom: "0.5rem" }}>
+                  Enter one entry per line: <code>Name</code> or <code>Name,INVITECODE</code>
+                </p>
+                <p className="label-mono text-dim" style={{ marginBottom: "0.75rem", fontSize: "0.82rem" }}>
+                  If no code is provided one will be generated automatically.
+                </p>
+                <textarea
+                  className="form-input"
+                  rows={8}
+                  placeholder={"Alice\nBob,CUSTOMCODE1\nCharlie\nDiana,DIANA999"}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.9rem", resize: "vertical" }}
+                />
+                {importError && (
+                  <p className="label-mono text-danger" style={{ marginTop: "0.4rem" }}>{importError}</p>
+                )}
+                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
+                  <button className="btn btn-primary btn-sm" onClick={handleImport} disabled={importLoading}>
+                    {importLoading ? "Importing…" : "Import"}
+                  </button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => { setShowImport(false); setImportText(""); setImportError(null); }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {newCodes.length > 0 && (
               <div style={{ marginBottom: "1.25rem", padding: "0.75rem 1rem", background: "color-mix(in srgb, var(--accent-teal) 10%, transparent)", border: "1px solid var(--accent-teal)", borderRadius: 6 }}>
@@ -501,6 +582,9 @@ function SessionManagerPage() {
                 </p>
                 {newCodes.map((c) => (
                   <div key={c.code} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "0.4rem", flexWrap: "wrap" }}>
+                    {c.label && (
+                      <span className="label-mono text-dim" style={{ fontStyle: "italic", minWidth: "8rem" }}>{c.label}</span>
+                    )}
                     <code className="label-mono" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {c.url}
                     </code>
