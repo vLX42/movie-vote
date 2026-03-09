@@ -52,11 +52,15 @@ await migrate(
   { migrationsFolder: join(process.cwd(), "drizzle") },
 );
 
-// Load persisted settings into process.env (app_settings is guaranteed to exist
-// now that migrations have run above).
-const settingsRows = sqlite
-  .prepare("SELECT key, value FROM app_settings WHERE value IS NOT NULL")
-  .all() as { key: string; value: string }[];
-for (const row of settingsRows) {
-  process.env[row.key] = row.value;
+// Load persisted settings into process.env now that migrations have run.
+// Wrapped in try/catch as a safety net in case the table is absent for any reason.
+try {
+  const settingsRows = sqlite
+    .prepare("SELECT key, value FROM app_settings WHERE value IS NOT NULL")
+    .all() as { key: string; value: string }[];
+  for (const row of settingsRows) {
+    process.env[row.key] = row.value;
+  }
+} catch {
+  // app_settings table not yet present — settings will be read from env vars only.
 }
