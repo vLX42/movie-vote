@@ -20,6 +20,9 @@ export const castVote = createServerFn({ method: "POST" })
 
     if (!session) throw new Error("NOT_FOUND");
     if (session.status !== "open") throw new Error("Session is closed");
+    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      throw new Error("Session has expired");
+    }
 
     const voter = await db
       .select()
@@ -105,6 +108,9 @@ export const retractVote = createServerFn({ method: "POST" })
 
     if (!session) throw new Error("NOT_FOUND");
     if (session.status !== "open") throw new Error("Session is closed");
+    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      throw new Error("Session has expired");
+    }
 
     // Find vote for this movie by this voter
     const vote = await db

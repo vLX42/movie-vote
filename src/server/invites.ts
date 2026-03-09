@@ -20,6 +20,7 @@ export const claimInvite = createServerFn({ method: "POST" })
         sessionSlug: sessions.slug,
         sessionName: sessions.name,
         sessionStatus: sessions.status,
+        sessionExpiresAt: sessions.expiresAt,
         votesPerVoter: sessions.votesPerVoter,
         guestInviteSlots: sessions.guestInviteSlots,
         maxInviteDepth: sessions.maxInviteDepth,
@@ -37,6 +38,10 @@ export const claimInvite = createServerFn({ method: "POST" })
     }
 
     if (invite.sessionStatus !== "open") {
+      throw new Error(`SESSION_CLOSED:${invite.sessionName}:${invite.sessionSlug}`);
+    }
+
+    if (invite.sessionExpiresAt && new Date(invite.sessionExpiresAt) < new Date()) {
       throw new Error(`SESSION_CLOSED:${invite.sessionName}:${invite.sessionSlug}`);
     }
 

@@ -428,6 +428,28 @@ export const adminDeleteSession = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+export const adminUpdateDeadline = createServerFn({ method: "POST" })
+  .inputValidator((input: { secret: string; id: string; expiresAt: string | null }) => input)
+  .handler(async ({ data }) => {
+    requireAdmin(data.secret);
+
+    const session = await db.select().from(sessions).where(eq(sessions.id, data.id)).get();
+    if (!session) throw new Error("NOT_FOUND");
+
+    if (data.expiresAt !== null) {
+      const d = new Date(data.expiresAt);
+      if (isNaN(d.getTime())) throw new Error("Invalid date for expiresAt");
+    }
+
+    await db
+      .update(sessions)
+      .set({ expiresAt: data.expiresAt ?? null })
+      .where(eq(sessions.id, data.id));
+
+    const updated = await db.select().from(sessions).where(eq(sessions.id, data.id)).get();
+    return { session: updated };
+  });
+
 export const adminGenerateCodes = createServerFn({ method: "POST" })
   .inputValidator((input: { secret: string; sessionId: string; count: number; label: string }) => input)
   .handler(async ({ data }) => {
