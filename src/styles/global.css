@@ -386,6 +386,10 @@ img { display: block; max-width: 100%; }
 .settings-key-status { margin-left: 0.5rem; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; }
 .settings-key-status--set   { color: var(--accent-teal); }
 .settings-key-status--unset { color: var(--text-dim); }
+.settings-test-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.settings-test-result { font-family: var(--font-mono); font-size: 0.8rem; }
+.settings-test-result--ok    { color: var(--accent-teal); }
+.settings-test-result--error { color: var(--accent-red); }
 .admin-nav__actions { display: flex; align-items: center; gap: 0.5rem; }
 
 .invite-list { display: flex; flex-direction: column; gap: 0.5rem; }

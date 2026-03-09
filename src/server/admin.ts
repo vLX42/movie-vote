@@ -536,13 +536,16 @@ export const adminGetSettings = createServerFn({ method: "POST" })
   .handler(async ({ data: secret }) => {
     requireAdmin(secret);
 
-    const rows = await db
-      .select({ key: appSettings.key, value: appSettings.value })
-      .from(appSettings);
-
     const map: Record<string, string | null> = {};
-    for (const row of rows) {
-      map[row.key] = row.value;
+    try {
+      const rows = await db
+        .select({ key: appSettings.key, value: appSettings.value })
+        .from(appSettings);
+      for (const row of rows) {
+        map[row.key] = row.value;
+      }
+    } catch {
+      // app_settings table doesn't exist yet — fall back to env vars only
     }
 
     return {
@@ -580,22 +583,102 @@ export const adminUpdateSettings = createServerFn({ method: "POST" })
 
     const now = new Date().toISOString();
 
-    for (const { key, value } of toApply) {
-      await db
-        .insert(appSettings)
-        .values({ key, value, updatedAt: now })
-        .onConflictDoUpdate({
-          target: appSettings.key,
-          set: { value, updatedAt: now },
-        });
+    try {
+      for (const { key, value } of toApply) {
+        await db
+          .insert(appSettings)
+          .values({ key, value, updatedAt: now })
+          .onConflictDoUpdate({
+            target: appSettings.key,
+            set: { value, updatedAt: now },
+          });
 
-      if (value === null) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
+        if (value === null) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
       }
+    } catch (err: any) {
+      if (err?.message?.includes("no such table")) {
+        throw new Error(
+          "Database migration required. Please run 'pnpm db:migrate' and restart the app.",
+        );
+      }
+      throw err;
     }
 
     const newSecret = data.newAdminSecret !== undefined ? data.newAdminSecret : undefined;
     return { success: true, newSecret };
+  });
+
+export const adminTestJellyfinConnection = createServerFn({ method: "POST" })
+  .inputValidator((secret: string) => secret)
+  .handler(async ({ data: secret }) => {
+    requireAdmin(secret);
+
+    const jellyfinUrl = process.env.JELLYFIN_URL;
+    const jellyfinKey = process.env.JELLYFIN_API_KEY;
+
+    if (!jellyfinUrl) throw new Error("Jellyfin URL is not configured");
+    if (!jellyfinKey) throw new Error("Jellyfin API key is not set");
+
+    const url = new URL(`${jellyfinUrl}/System/Info`);
+    url.searchParams.set("api_key", jellyfinKey);
+
+    let response: Response;
+    try {
+      response = await fetch(url.toString());
+    } catch (err: any) {
+      throw new Error(`Could not reach Jellyfin: ${err?.message ?? "network error"}`);
+    }
+
+    if (!response.ok) throw new Error(`Jellyfin returned HTTP ${response.status}`);
+
+    let data: { ServerName?: string; Version?: string } = {};
+    try {
+      data = await response.json();
+    } catch {
+      // Non-JSON response — connection works but info unavailable
+    }
+    return {
+      ok: true,
+      message: `Connected — ${data.ServerName ?? "Jellyfin"} v${data.Version ?? "?"}`,
+    };
+  });
+
+export const adminTestJellyseerrConnection = createServerFn({ method: "POST" })
+  .inputValidator((secret: string) => secret)
+  .handler(async ({ data: secret }) => {
+    requireAdmin(secret);
+
+    const jellyseerrUrl = process.env.JELLYSEERR_URL;
+    const jellyseerrKey = process.env.JELLYSEERR_API_KEY;
+
+    if (!jellyseerrUrl) throw new Error("Jellyseerr URL is not configured");
+    if (!jellyseerrKey) throw new Error("Jellyseerr API key is not set");
+
+    const url = new URL(`${jellyseerrUrl}/api/v1/settings/main`);
+
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), {
+        headers: { "X-Api-Key": jellyseerrKey },
+      });
+    } catch (err: any) {
+      throw new Error(`Could not reach Jellyseerr: ${err?.message ?? "network error"}`);
+    }
+
+    if (!response.ok) throw new Error(`Jellyseerr returned HTTP ${response.status}`);
+
+    let data: { applicationTitle?: string } = {};
+    try {
+      data = await response.json();
+    } catch {
+      // Non-JSON response — connection works but info unavailable
+    }
+    return {
+      ok: true,
+      message: `Connected — ${data.applicationTitle ?? "Jellyseerr"}`,
+    };
   });

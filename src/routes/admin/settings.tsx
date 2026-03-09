@@ -1,6 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { adminGetSettings, adminUpdateSettings } from "../../server/admin";
+import {
+  adminGetSettings,
+  adminUpdateSettings,
+  adminTestJellyfinConnection,
+  adminTestJellyseerrConnection,
+} from "../../server/admin";
 
 export const Route = createFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -34,6 +39,12 @@ function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  type TestStatus = { ok: boolean; message: string } | null;
+  const [jellyfinTest, setJellyfinTest] = useState<TestStatus>(null);
+  const [jellyseerrTest, setJellyseerrTest] = useState<TestStatus>(null);
+  const [testingJellyfin, setTestingJellyfin] = useState(false);
+  const [testingJellyseerr, setTestingJellyseerr] = useState(false);
+
   async function loadSettings(currentSecret: string) {
     try {
       const s = await adminGetSettings({ data: currentSecret });
@@ -61,6 +72,32 @@ function SettingsPage() {
         </p>
       </div>
     );
+  }
+
+  async function handleTestJellyfin() {
+    setJellyfinTest(null);
+    setTestingJellyfin(true);
+    try {
+      const result = await adminTestJellyfinConnection({ data: secret });
+      setJellyfinTest({ ok: true, message: result.message });
+    } catch (err: any) {
+      setJellyfinTest({ ok: false, message: err?.message ?? "Connection failed" });
+    } finally {
+      setTestingJellyfin(false);
+    }
+  }
+
+  async function handleTestJellyseerr() {
+    setJellyseerrTest(null);
+    setTestingJellyseerr(true);
+    try {
+      const result = await adminTestJellyseerrConnection({ data: secret });
+      setJellyseerrTest({ ok: true, message: result.message });
+    } catch (err: any) {
+      setJellyseerrTest({ ok: false, message: err?.message ?? "Connection failed" });
+    } finally {
+      setTestingJellyseerr(false);
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -162,6 +199,21 @@ function SettingsPage() {
                   autoComplete="new-password"
                 />
               </div>
+              <div className="settings-test-row">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleTestJellyfin}
+                  disabled={testingJellyfin}
+                >
+                  {testingJellyfin ? "Testing…" : "Test Connection"}
+                </button>
+                {jellyfinTest && (
+                  <span className={`settings-test-result settings-test-result--${jellyfinTest.ok ? "ok" : "error"}`}>
+                    {jellyfinTest.ok ? "✓" : "✗"} {jellyfinTest.message}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -197,6 +249,21 @@ function SettingsPage() {
                   placeholder="Leave blank to keep current value"
                   autoComplete="new-password"
                 />
+              </div>
+              <div className="settings-test-row">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleTestJellyseerr}
+                  disabled={testingJellyseerr}
+                >
+                  {testingJellyseerr ? "Testing…" : "Test Connection"}
+                </button>
+                {jellyseerrTest && (
+                  <span className={`settings-test-result settings-test-result--${jellyseerrTest.ok ? "ok" : "error"}`}>
+                    {jellyseerrTest.ok ? "✓" : "✗"} {jellyseerrTest.message}
+                  </span>
+                )}
               </div>
             </div>
           </div>
