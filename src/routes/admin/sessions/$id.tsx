@@ -13,6 +13,7 @@ import {
   adminClearVotes,
   adminRemoveVoter,
   adminAdjustInviteSlots,
+  adminUpdateDeadline,
 } from "../../../server/admin";
 
 export const Route = createFileRoute("/admin/sessions/$id")({
@@ -49,6 +50,8 @@ function SessionManagerPage() {
   const [newCodes, setNewCodes] = useState<{ code: string; url: string }[]>([]);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [editingSlots, setEditingSlots] = useState<{ voterId: string; value: string } | null>(null);
+  const [editingDeadline, setEditingDeadline] = useState(false);
+  const [deadlineValue, setDeadlineValue] = useState("");
 
   if (!secret) {
     return (
@@ -202,6 +205,25 @@ function SessionManagerPage() {
     }
   }
 
+  async function saveDeadline() {
+    try {
+      let parsed: string | null = null;
+      if (deadlineValue.trim()) {
+        const d = new Date(deadlineValue);
+        if (isNaN(d.getTime())) {
+          alert("Invalid date. Please enter a valid date and time.");
+          return;
+        }
+        parsed = d.toISOString();
+      }
+      await adminUpdateDeadline({ data: { secret, id, expiresAt: parsed } });
+      setEditingDeadline(false);
+      loadData();
+    } catch (err: any) {
+      alert(err?.message ?? "Failed to update deadline");
+    }
+  }
+
   async function deleteSession() {
     if (!confirm(`Delete session "${session.name}"? This cannot be undone and will remove all voters, movies, and votes.`)) return;
     try {
@@ -214,6 +236,7 @@ function SessionManagerPage() {
 
   const winnerMovie = session.winnerMovieId ? movies.find((m: any) => m.id === session.winnerMovieId) : null;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const isExpired = !!session.expiresAt && new Date(session.expiresAt) < new Date();
 
   return (
     <div className="admin-page">
@@ -223,8 +246,8 @@ function SessionManagerPage() {
           <div className="session-overview__info">
             <h2 className="title-medium">{session.name}</h2>
             <span className="label-mono text-muted">/vote/{session.slug}</span>
-            <span className={`badge ${session.status === "open" ? "badge-library" : "badge-requested"}`}>
-              {session.status}
+            <span className={`badge ${session.status === "open" ? (isExpired ? "badge-expired" : "badge-library") : "badge-requested"}`}>
+              {session.status === "open" && isExpired ? "expired" : session.status}
             </span>
           </div>
 
@@ -233,6 +256,57 @@ function SessionManagerPage() {
             <Stat value={movies.length} label="Films" />
             <Stat value={codes.filter((c: any) => c.status === "unused").length} label="Open Codes" />
             <Stat value={session.votesPerVoter} label="Votes/Voter" />
+          </div>
+
+          <div className="session-overview__deadline">
+            <span className="label-mono text-muted" style={{ marginRight: "0.5rem" }}>
+              Deadline:
+            </span>
+            {editingDeadline ? (
+              <span style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                <input
+                  type="datetime-local"
+                  className="form-input"
+                  style={{ padding: "0.2rem 0.4rem", width: "auto" }}
+                  value={deadlineValue}
+                  onChange={(e) => setDeadlineValue(e.target.value)}
+                />
+                <button className="btn btn-primary btn-sm" onClick={saveDeadline}>Save</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setEditingDeadline(false)}>Cancel</button>
+                {deadlineValue && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => { setDeadlineValue(""); }}
+                    title="Clear deadline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                <span className={`label-mono${isExpired ? " text-danger" : session.expiresAt ? "" : " text-dim"}`}>
+                  {session.expiresAt
+                    ? new Date(session.expiresAt).toLocaleString()
+                    : "None"}
+                  {isExpired && " (expired)"}
+                </span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    const localVal = session.expiresAt
+                      ? new Date(new Date(session.expiresAt).getTime() - new Date().getTimezoneOffset() * 60000)
+                          .toISOString()
+                          .slice(0, 16)
+                      : "";
+                    setDeadlineValue(localVal);
+                    setEditingDeadline(true);
+                  }}
+                >
+                  Edit
+                </button>
+              </span>
+            )}
           </div>
 
           <div className="session-overview__actions">

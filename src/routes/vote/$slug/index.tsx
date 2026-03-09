@@ -102,7 +102,9 @@ function VotingRoomPage() {
 
   const { session, voter, movies: loaderMovies } = loaderData;
   const movies = optimisticMovies ?? loaderMovies;
-  const isOpen = session.status === "open";
+  const isExpired = !!session.expiresAt && new Date(session.expiresAt) < new Date();
+  const isOpen = session.status === "open" && !isExpired;
+  const isClosed = session.status === "closed";
   const votesUsed = optimisticVotesUsed !== null ? optimisticVotesUsed : voter.votesUsed;
   const votesRemaining = session.votesPerVoter - votesUsed;
   const voterForCards = { ...voter, votesRemaining };
@@ -123,14 +125,31 @@ function VotingRoomPage() {
             totalSlots={voter.inviteSlotsRemaining}
             onOpen={() => setView("invites")}
           />
-          {session.status === "closed" && (
+          {isExpired && session.status === "open" && (
+            <span className="badge badge-expired">Expired</span>
+          )}
+          {isClosed && (
             <span className="badge badge-requested">Closed</span>
           )}
         </div>
       </header>
 
-      {session.status === "closed" && session.winnerMovieId && (
+      {(isClosed || isExpired) && session.winnerMovieId && (
         <WinnerBanner movie={movies.find((m) => m.id === session.winnerMovieId)} />
+      )}
+
+      {isExpired && !isClosed && (
+        <div className="deadline-notice deadline-notice--expired">
+          <span className="label-mono">Voting has closed — deadline passed. Your nominations are preserved below.</span>
+        </div>
+      )}
+
+      {isOpen && session.expiresAt && (
+        <div className="deadline-notice">
+          <span className="label-mono">
+            Voting closes {new Date(session.expiresAt).toLocaleString()}
+          </span>
+        </div>
       )}
 
       {isOpen && (
@@ -374,7 +393,7 @@ function EmptyState({ isOpen }: { isOpen: boolean }) {
       <p className="empty-state__sub label-mono">
         {isOpen
           ? "Use the search above to find a movie and nominate it. Everyone can nominate, and everyone votes."
-          : "Nothing was nominated before voting closed."}
+          : "Nothing was nominated before voting closed — no data was deleted, this session is just empty."}
       </p>
     </div>
   );

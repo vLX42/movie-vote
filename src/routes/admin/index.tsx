@@ -135,8 +135,16 @@ function AdminDashboard() {
 
 function SessionCard({ session, secret, onDeleted }: { session: any; secret: string; onDeleted: () => void }) {
   const [deleting, setDeleting] = useState(false);
+  const isExpired = !!session.expiresAt && new Date(session.expiresAt) < new Date();
   const statusClass =
-    session.status === "open" ? "badge-library" : session.status === "closed" ? "badge-requested" : "badge-nominated";
+    session.status === "open"
+      ? isExpired
+        ? "badge-expired"
+        : "badge-library"
+      : session.status === "closed"
+        ? "badge-requested"
+        : "badge-nominated";
+  const statusLabel = session.status === "open" && isExpired ? "expired" : session.status;
 
   async function handleDelete() {
     if (!confirm(`Delete session "${session.name}"? This cannot be undone and will remove all voters, movies, and votes.`)) return;
@@ -157,7 +165,7 @@ function SessionCard({ session, secret, onDeleted }: { session: any; secret: str
           <h3 className="session-card__name title-medium">{session.name}</h3>
           <span className="label-mono text-muted">/vote/{session.slug}</span>
         </div>
-        <span className={`badge ${statusClass}`}>{session.status}</span>
+        <span className={`badge ${statusClass}`}>{statusLabel}</span>
       </div>
 
       <div className="session-card__stats">
@@ -180,9 +188,17 @@ function SessionCard({ session, secret, onDeleted }: { session: any; secret: str
       </div>
 
       <div className="session-card__footer">
-        <span className="label-mono text-dim">
-          Created {new Date(session.createdAt).toLocaleDateString()}
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+          <span className="label-mono text-dim">
+            Created {new Date(session.createdAt).toLocaleDateString()}
+          </span>
+          {session.expiresAt && (
+            <span className={`label-mono${isExpired ? " text-danger" : " text-dim"}`}>
+              Deadline: {new Date(session.expiresAt).toLocaleString()}
+              {isExpired && " (expired)"}
+            </span>
+          )}
+        </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button
             className="btn btn-danger btn-sm"
