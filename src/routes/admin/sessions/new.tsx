@@ -249,6 +249,7 @@ function AdminHeader({ title }: { title: string }) {
         <span className="admin-nav__sep">·</span>
         <span className="label-mono">{title}</span>
       </Link>
+      <Link to="/admin/settings" className="btn btn-secondary btn-sm">Settings</Link>
     </nav>
   );
 }
