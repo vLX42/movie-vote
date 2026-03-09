@@ -1,5 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
+import { migrate } from "drizzle-orm/sqlite-proxy/migrator";
+import { join } from "node:path";
 import * as schema from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -11,19 +13,6 @@ if (!databaseUrl) {
 const dbPath = databaseUrl.startsWith("file:") ? databaseUrl.slice(5) : databaseUrl;
 
 const sqlite = new DatabaseSync(dbPath);
-
-// Load persisted settings into process.env at startup (before drizzle is used).
-// Wrapped in try/catch: the table may not exist yet on a fresh DB before migrations.
-try {
-  const settingsRows = sqlite
-    .prepare("SELECT key, value FROM app_settings WHERE value IS NOT NULL")
-    .all() as { key: string; value: string }[];
-  for (const row of settingsRows) {
-    process.env[row.key] = row.value;
-  }
-} catch {
-  // Table doesn't exist yet — safe to ignore
-}
 
 export const db = drizzle(
   async (sql, params, method) => {
@@ -49,3 +38,25 @@ export const db = drizzle(
   },
   { schema },
 );
+
+// Automatically apply any pending migrations at startup so the schema is always
+// up-to-date before the server handles its first request.  The migrator is
+// idempotent — it tracks applied migrations and skips them on subsequent runs.
+await migrate(
+  db,
+  async (queries) => {
+    for (const query of queries) {
+      sqlite.exec(query);
+    }
+  },
+  { migrationsFolder: join(process.cwd(), "drizzle") },
+);
+
+// Load persisted settings into process.env (app_settings is guaranteed to exist
+// now that migrations have run above).
+const settingsRows = sqlite
+  .prepare("SELECT key, value FROM app_settings WHERE value IS NOT NULL")
+  .all() as { key: string; value: string }[];
+for (const row of settingsRows) {
+  process.env[row.key] = row.value;
+}
