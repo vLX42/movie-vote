@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { eq, sql, and } from "drizzle-orm";
 import { db } from "../db";
-import { sessions, movies, voters, votes, inviteCodes } from "../db/schema";
+import { sessions, movies, voters, votes, inviteCodes, appSettings } from "../db/schema";
 import { generateInviteCode } from "../lib/inviteCodes";
 import { getRequestUrl } from "@tanstack/react-start/server";
 
@@ -460,4 +460,73 @@ export const adminGenerateCodes = createServerFn({ method: "POST" })
     return {
       codes: codes.map((c) => ({ code: c, url: `${baseUrl}/join/${c}` })),
     };
+  });
+
+export const adminGetSettings = createServerFn({ method: "POST" })
+  .inputValidator((secret: string) => secret)
+  .handler(async ({ data: secret }) => {
+    requireAdmin(secret);
+
+    const rows = await db
+      .select({ key: appSettings.key, value: appSettings.value })
+      .from(appSettings);
+
+    const map: Record<string, string | null> = {};
+    for (const row of rows) {
+      map[row.key] = row.value;
+    }
+
+    return {
+      jellyfinUrl:          map["JELLYFIN_URL"]      ?? process.env.JELLYFIN_URL      ?? "",
+      jellyfinApiKeySet:    !!(map["JELLYFIN_API_KEY"]  ?? process.env.JELLYFIN_API_KEY),
+      jellyseerrUrl:        map["JELLYSEERR_URL"]    ?? process.env.JELLYSEERR_URL    ?? "",
+      jellyseerrApiKeySet:  !!(map["JELLYSEERR_API_KEY"] ?? process.env.JELLYSEERR_API_KEY),
+    };
+  });
+
+type UpdateSettingsInput = {
+  secret: string;
+  jellyfinUrl?: string;
+  jellyfinApiKey?: string;
+  jellyseerrUrl?: string;
+  jellyseerrApiKey?: string;
+  newAdminSecret?: string;
+};
+
+export const adminUpdateSettings = createServerFn({ method: "POST" })
+  .inputValidator((input: UpdateSettingsInput) => input)
+  .handler(async ({ data }) => {
+    requireAdmin(data.secret);
+
+    if (data.newAdminSecret !== undefined && data.newAdminSecret === "") {
+      throw new Error("Admin password cannot be empty");
+    }
+
+    const toApply: Array<{ key: string; value: string | null }> = [];
+    if (data.jellyfinUrl    !== undefined) toApply.push({ key: "JELLYFIN_URL",      value: data.jellyfinUrl    || null });
+    if (data.jellyfinApiKey !== undefined) toApply.push({ key: "JELLYFIN_API_KEY",  value: data.jellyfinApiKey || null });
+    if (data.jellyseerrUrl    !== undefined) toApply.push({ key: "JELLYSEERR_URL",    value: data.jellyseerrUrl    || null });
+    if (data.jellyseerrApiKey !== undefined) toApply.push({ key: "JELLYSEERR_API_KEY", value: data.jellyseerrApiKey || null });
+    if (data.newAdminSecret !== undefined) toApply.push({ key: "ADMIN_SECRET",      value: data.newAdminSecret || null });
+
+    const now = new Date().toISOString();
+
+    for (const { key, value } of toApply) {
+      await db
+        .insert(appSettings)
+        .values({ key, value, updatedAt: now })
+        .onConflictDoUpdate({
+          target: appSettings.key,
+          set: { value, updatedAt: now },
+        });
+
+      if (value === null) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+
+    const newSecret = data.newAdminSecret !== undefined ? data.newAdminSecret : undefined;
+    return { success: true, newSecret };
   });

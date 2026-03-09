@@ -64,3 +64,9 @@ export const votes = sqliteTable("votes", {
   movieId: text("movie_id").notNull().references(() => movies.id),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
+
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});

@@ -208,9 +208,12 @@ function AdminNav({ onSignOut }: { onSignOut: () => void }) {
         <span className="admin-nav__sep">·</span>
         <span className="label-mono text-muted">Admin</span>
       </Link>
-      <button className="btn btn-secondary btn-sm" onClick={onSignOut}>
-        Sign Out
-      </button>
+      <div className="admin-nav__actions">
+        <Link to="/admin/settings" className="btn btn-secondary btn-sm">Settings</Link>
+        <button className="btn btn-secondary btn-sm" onClick={onSignOut}>
+          Sign Out
+        </button>
+      </div>
     </nav>
   );
 }
