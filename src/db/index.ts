@@ -12,6 +12,19 @@ const dbPath = databaseUrl.startsWith("file:") ? databaseUrl.slice(5) : database
 
 const sqlite = new DatabaseSync(dbPath);
 
+// Load persisted settings into process.env at startup (before drizzle is used).
+// Wrapped in try/catch: the table may not exist yet on a fresh DB before migrations.
+try {
+  const settingsRows = sqlite
+    .prepare("SELECT key, value FROM app_settings WHERE value IS NOT NULL")
+    .all() as { key: string; value: string }[];
+  for (const row of settingsRows) {
+    process.env[row.key] = row.value;
+  }
+} catch {
+  // Table doesn't exist yet — safe to ignore
+}
+
 export const db = drizzle(
   async (sql, params, method) => {
     const stmt = sqlite.prepare(sql);

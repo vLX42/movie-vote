@@ -762,6 +762,7 @@ function AdminHeader({ sessionName }: { sessionName?: string }) {
           </>
         )}
       </Link>
+      <Link to="/admin/settings" className="btn btn-secondary btn-sm">Settings</Link>
     </nav>
   );
 }
