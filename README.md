@@ -46,7 +46,103 @@ The UI uses a dark, monospace-heavy film-reel aesthetic throughout.
 
 ---
 
-## Quick Start with Docker Compose
+## Quick Start — Pre-built Image (Recommended)
+
+No git clone or build step required. The image is published automatically to the GitHub Container Registry on every commit to `main`.
+
+### 1. Create a working directory
+
+```bash
+mkdir movienightapp && cd movienightapp
+```
+
+### 2. Download the Compose file
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vLX42/movie-vote/main/docker-compose.yml -o docker-compose.yml
+```
+
+Or create `docker-compose.yml` manually with this content:
+
+```yaml
+services:
+  app:
+    image: ghcr.io/vlx42/movie-vote:latest
+    ports:
+      - "8090:3000"
+    volumes:
+      - ./db:/app/db-data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/db-data/movienightapp.db
+      - JELLYFIN_URL=${JELLYFIN_URL:-http://jellyfin:8096}
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
+      - JELLYSEERR_URL=${JELLYSEERR_URL:-http://jellyseerr:5055}
+      - JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY}
+      - ADMIN_SECRET=${ADMIN_SECRET}
+    networks:
+      - movienightnet
+    restart: unless-stopped
+
+networks:
+  movienightnet:
+    external: true
+```
+
+### 3. Create your `.env` file
+
+```bash
+cat > .env <<'EOF'
+# Generate a secret: openssl rand -hex 32
+ADMIN_SECRET=replace_with_your_long_random_secret
+
+DATABASE_URL=file:/app/db-data/movienightapp.db
+
+# Optional — remove or leave blank if not using Jellyfin/Jellyseerr
+JELLYFIN_URL=http://jellyfin:8096
+JELLYFIN_API_KEY=replace_with_your_jellyfin_api_key
+JELLYSEERR_URL=http://jellyseerr:5055
+JELLYSEERR_API_KEY=replace_with_your_jellyseerr_api_key
+EOF
+```
+
+Replace each `replace_with_…` placeholder with your real values, then save the file.
+
+### 4. Create the external Docker network (once)
+
+```bash
+docker network create movienightnet
+```
+
+If Jellyfin or Jellyseerr are running as Docker containers, connect them to the same network:
+
+```bash
+docker network connect movienightnet jellyfin
+docker network connect movienightnet jellyseerr
+```
+
+### 5. Pull the image and start
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+The app is available at `http://your-host:8090`.  
+The database is persisted to `./db/movienightapp.db` on the host.
+
+### Updating to the latest image
+
+```bash
+docker compose pull
+docker compose up -d --force-recreate
+```
+
+---
+
+## Quick Start — Build from Source
+
+Use this if you want to run from the latest source code or make local changes.
 
 ### 1. Create the external Docker network (once)
 
@@ -54,9 +150,11 @@ The UI uses a dark, monospace-heavy film-reel aesthetic throughout.
 docker network create movienightnet
 ```
 
-### 2. Create your `.env` file
+### 2. Clone the repo and create your `.env` file
 
 ```bash
+git clone https://github.com/vLX42/movie-vote.git
+cd movie-vote
 cp .env.example .env
 ```
 
@@ -73,10 +171,10 @@ JELLYSEERR_URL=http://jellyseerr:5055
 JELLYSEERR_API_KEY=your_jellyseerr_api_key
 ```
 
-### 3. Start the app
+### 3. Build and start the app
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 The app is available at `http://your-host:8090`.
