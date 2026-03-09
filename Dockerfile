@@ -11,9 +11,10 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-l
 FROM base AS build
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build
+RUN node_modules/.bin/esbuild src/db/migrate.ts --platform=node --packages=external --format=esm --outfile=.output/migrate.mjs
 
 FROM base
 COPY --from=prod-deps /app/node_modules /app/node_modules
 COPY --from=build /app/.output /app/.output
 EXPOSE 3000
-CMD ["sh", "-c", "pnpm db:migrate && pnpm start"]
+CMD ["sh", "-c", "node .output/migrate.mjs && node .output/server/index.mjs"]
