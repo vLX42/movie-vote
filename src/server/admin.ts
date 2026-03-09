@@ -450,6 +450,53 @@ export const adminUpdateDeadline = createServerFn({ method: "POST" })
     return { session: updated };
   });
 
+export const adminImportCodes = createServerFn({ method: "POST" })
+  .inputValidator((input: { secret: string; sessionId: string; entries: { label: string; code?: string }[] }) => input)
+  .handler(async ({ data }) => {
+    requireAdmin(data.secret);
+
+    if (!Array.isArray(data.entries) || data.entries.length === 0) {
+      throw new Error("No entries provided");
+    }
+    if (data.entries.length > 200) {
+      throw new Error("Too many entries (max 200)");
+    }
+
+    const session = await db.select().from(sessions).where(eq(sessions.id, data.sessionId)).get();
+    if (!session) throw new Error("NOT_FOUND");
+
+    const url = getRequestUrl();
+    const baseUrl = `${url.protocol}//${url.host}`;
+    const created: { code: string; url: string; label: string }[] = [];
+
+    for (const entry of data.entries) {
+      const label = (entry.label ?? "").trim();
+      if (!label) continue;
+
+      const code = (entry.code ?? "").trim().toUpperCase() || generateInviteCode();
+
+      const existing = await db
+        .select({ code: inviteCodes.code })
+        .from(inviteCodes)
+        .where(eq(inviteCodes.code, code))
+        .get();
+      if (existing) {
+        throw new Error(`Invite code "${code}" already exists`);
+      }
+
+      await db.insert(inviteCodes).values({
+        code,
+        sessionId: session.id,
+        createdByVoterId: null,
+        status: "unused",
+        label,
+      });
+      created.push({ code, url: `${baseUrl}/join/${code}`, label });
+    }
+
+    return { codes: created };
+  });
+
 export const adminGenerateCodes = createServerFn({ method: "POST" })
   .inputValidator((input: { secret: string; sessionId: string; count: number; label: string }) => input)
   .handler(async ({ data }) => {
